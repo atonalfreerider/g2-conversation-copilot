@@ -1,6 +1,7 @@
 package com.g2copilot.settings;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.text.InputType;
@@ -29,9 +30,11 @@ public final class MainActivity extends Activity {
         root.addView(label("Stance (I/D)")); stance=choice("Inquisitive (I)","Declarative (D)"); root.addView(stance);
         riskValue=label(""); root.addView(riskValue); risk=slider(); root.addView(risk);
         Button saveDefaults=button("Save defaults"); root.addView(saveDefaults); status=text("Keys stay encrypted on this phone.",14); status.setPadding(0,dp(18),0,0); root.addView(status);
+        Button simulator=button("Open glasses simulator"); root.addView(simulator);
         provider.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){ public void onItemSelected(AdapterView<?> p,View v,int pos,long id){load(Provider.values()[pos]);} public void onNothingSelected(AdapterView<?> p){} });
         risk.setOnSeekBarChangeListener(listener(()->updateTone())); updateTone();
         save.setOnClickListener(v->saveConnection()); test.setOnClickListener(v->testConnection()); saveDefaults.setOnClickListener(v->{getPreferences(MODE_PRIVATE).edit().putInt("words",number(words,20)).putString("persona",persona.getSelectedItemPosition()==0?"P":"S").putString("stance",stance.getSelectedItemPosition()==0?"I":"D").putInt("risk",risk.getProgress()).apply(); show("Defaults saved");});
+        simulator.setOnClickListener(v->startActivity(new Intent(this,SimulatorActivity.class)));
         return scroll;
     }
     private void load(Provider p) { try { apiKey.setText(settings.key(p)); model.setText(settings.model(p)); endpoint.setText(settings.url(p)); } catch(Exception e){ show("Could not unlock saved key"); } }

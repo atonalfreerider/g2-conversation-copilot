@@ -67,6 +67,10 @@ Or run `./deploy-android.sh` to build, verify that the Pixel authorized USB debu
 
 The APK intentionally does not contain provider keys. Enter them on the phone after installation.
 
+### Pixel glasses simulator
+
+Tap **Open glasses simulator** in the Android app to test without G2 hardware. It includes a lens-sized preview, live Pixel microphone transcription with partial updates, typed input fallback, automatic mock language detection, English versus phonetic branches, and on-screen R1 scroll/press controls. Android requests microphone permission the first time **Start microphone** is tapped. Speech recognition uses the recognition service configured on the phone; provider calls remain separate.
+
 On Ubuntu, the complete host prerequisites can be installed with:
 
 ```bash
