@@ -1,0 +1,9 @@
+{
+  "name": "g2-conversation-copilot-prototype",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "demo": "node server.mjs",
+    "test": "node --test"
+  }
+}
