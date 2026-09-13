@@ -1,17 +1,46 @@
 # G2 Conversation Copilot prototype
 
-This is a dependency-free interaction prototype for an Even G2 conversation copilot. It demonstrates the state machine, compact glasses rendering, two-axis R1 tone steering, rolling 20-word context, mode switching, and off-script English handling without sending audio or text to a real provider.
+This is a dependency-free interaction prototype for an Even G2 conversation copilot. It demonstrates the state machine, compact glasses rendering, three-axis R1 tone steering, rolling 20-word context, mode switching, and off-script English handling without sending audio or text to a real provider.
 
 The ring changes future suggestions rather than selecting a scripted response:
 
-- Press switches the active axis: stance or risk.
-- Swipe up moves toward inquisitive or safe.
-- Swipe down moves toward declarative or risky.
+- Press cycles the active axis: persona → stance → risk.
+- On persona, either scroll direction toggles `P` playful / `S` strategic.
+- On stance, either scroll direction toggles `I` inquisitive / `D` declarative.
+- On risk, scroll adjusts `1` safest through `7` riskiest.
 - Double press stops the session.
 
-Each axis ranges from 0–7: stance is `0 = inquisitive`, `7 = declarative`; risk is `0 = safe`, `7 = risky`. The first conversation branch is prefixed with detected-language and tone status, such as `PL 2/5 • ...`.
+The first conversation branch is prefixed with detected language and compact settings, such as `PL P I 2 • ...`. Brackets show the currently active ring axis: `PL [P] I 2`, `PL P [I] 2`, or `PL P I [2]`.
 
 Language is detected by the backend. The top display area is always the English rendering of the last N microphone words (20 by default). The lower area shows English branches for English speech, or only English-readable phonetic branches for foreign speech.
+
+## API instruction examples
+
+Yes—the current settings are placed at the very beginning of every provider request, before conversation context. The normalized instruction header looks like:
+
+```text
+CONTROL VARIABLES: language=AUTO; persona=P; stance=I; risk=2/7.
+```
+
+Examples:
+
+```text
+CONTROL VARIABLES: language=AUTO; persona=P; stance=I; risk=1/7.
+```
+
+Generate playful, question-led, socially safe branches—for example, light curiosity that makes it easy for the other person to continue.
+
+```text
+CONTROL VARIABLES: language=AUTO; persona=S; stance=I; risk=4/7.
+```
+
+Generate strategic, trust-building questions with moderate directness, without manipulation or pressure.
+
+```text
+CONTROL VARIABLES: language=AUTO; persona=P; stance=D; risk=7/7.
+```
+
+Generate bold, playful statements rather than questions. “7” permits social daring and vulnerability, but never deception, coercion, illegality, or boundary violations.
 
 ## Run
 

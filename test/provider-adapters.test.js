@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { generateSuggestion } from "../backend/provider-adapters.js";
 
-const request = { mode:"playful", tone:{stance:3,risk:3}, contextWordCount:20, rollingText:"hello", latestText:"hello" };
+const request = { mode:"playful", tone:{stance:"inquisitive",risk:4}, contextWordCount:20, rollingText:"hello", latestText:"hello" };
 const card = { detectedLanguage:"EN", englishContext:"hello", replies:[{english:"Hi."}] };
 
 test("OpenAI and xAI use Responses with bearer auth and schema", async () => {

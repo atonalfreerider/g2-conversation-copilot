@@ -8,7 +8,7 @@ export class ConversationCopilot {
   constructor({ contextWordCount = 20, mode = Mode.PLAYFUL } = {}) {
     this.state = {
       detectedLanguage: "EN", contextWordCount, mode, listening: false,
-      tone: { focus: "stance", stance: 3, risk: 3 }, transcript: [],
+      tone: { focus: "persona", stance: "inquisitive", risk: 4 }, transcript: [],
       card: { detectedLanguage: "EN", englishContext: "Ready", replies: [] },
     };
   }
@@ -23,7 +23,7 @@ export class ConversationCopilot {
     const foreign = this.state.detectedLanguage !== "EN";
     this.state.card = suggestionEngine({
       mode: this.state.mode,
-      tone: { stance: this.state.tone.stance, risk: this.state.tone.risk },
+      tone: { persona: this.state.mode, stance: this.state.tone.stance, risk: this.state.tone.risk },
       detectedLanguage: this.state.detectedLanguage, foreign,
       latestSpeaker: speaker, contextWordCount: this.state.contextWordCount,
       rollingText: lastWords(this.state.transcript.map(x => x.text).join(" "), this.state.contextWordCount),
@@ -36,9 +36,15 @@ export class ConversationCopilot {
 
   ring(action) {
     const tone = this.state.tone;
-    if (action === "press") tone.focus = tone.focus === "stance" ? "risk" : "stance";
-    if (action === "swipe_down") tone[tone.focus] = Math.min(7, tone[tone.focus] + 1);
-    if (action === "swipe_up") tone[tone.focus] = Math.max(0, tone[tone.focus] - 1);
+    if (action === "press") {
+      const axes = ["persona", "stance", "risk"];
+      tone.focus = axes[(axes.indexOf(tone.focus) + 1) % axes.length];
+    }
+    if (action === "swipe_down" || action === "swipe_up") {
+      if (tone.focus === "persona") this.toggleMode();
+      if (tone.focus === "stance") tone.stance = tone.stance === "inquisitive" ? "declarative" : "inquisitive";
+      if (tone.focus === "risk") tone.risk = Math.max(1, Math.min(7, tone.risk + (action === "swipe_down" ? 1 : -1)));
+    }
     if (action === "double_press") this.stop();
     return this.snapshot();
   }
@@ -46,7 +52,13 @@ export class ConversationCopilot {
   displayLines() {
     const s = this.state;
     const foreign = s.detectedLanguage !== "EN";
-    const status = `${s.detectedLanguage} ${s.tone.stance}/${s.tone.risk}`;
+    const tokens = {
+      persona: s.mode === Mode.PLAYFUL ? "P" : "S",
+      stance: s.tone.stance === "inquisitive" ? "I" : "D",
+      risk: String(s.tone.risk),
+    };
+    tokens[s.tone.focus] = `[${tokens[s.tone.focus]}]`;
+    const status = `${s.detectedLanguage} ${tokens.persona} ${tokens.stance} ${tokens.risk}`;
     const lines = [s.card.englishContext];
     s.card.replies.forEach((r, index) => {
       const branch = `• ${foreign ? r.phonetic : r.english}`;
@@ -65,9 +77,9 @@ export function mockSuggestionEngine(req) {
   if (!foreign) {
     const inquisitive = req.mode === Mode.PLAYFUL ? "What’s the fun version?" : "What matters most to you?";
     const declarative = req.mode === Mode.PLAYFUL ? "Okay, that has a story." : "That sounds important to you.";
-    const lead = req.tone.stance <= 2 ? inquisitive : req.tone.stance >= 5 ? declarative : "Tell me more about that.";
+    const lead = req.tone.stance === "inquisitive" ? inquisitive : declarative;
     const edge = req.tone.risk >= 5 ? "Here’s the bold take." : req.tone.risk <= 2 ? "We can take this slowly." : "I’m with you.";
-    const replies = [lead, edge, req.tone.stance <= 2 ? "And then what happened?" : "I see where you’re coming from."];
+    const replies = [lead, edge, req.tone.stance === "inquisitive" ? "And then what happened?" : "I see where you’re coming from."];
     return { detectedLanguage, englishContext: lastWords(req.latestText, req.contextWordCount), replies: replies.map(english => ({ english })) };
   }
   if (req.userWentOffScript) return {

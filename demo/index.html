@@ -7,7 +7,7 @@ body{margin:0;background:#10130f;color:#edf7ea;font:16px system-ui;display:grid;
 </style>
 <main class="wrap"><h1>Conversation Copilot</h1><p class="hint">Local interaction mock — no audio or network leaves this page.</p><div class="glass"><div id="screen" class="screen"></div></div>
 <div class="controls"><button id="mode">Mode: playful</button><input id="utterance" value="I changed careers last year because I wanted something meaningful"><button id="hear">Hear them</button><button id="say">I said it</button></div>
-<div class="controls" style="margin-top:10px"><button data-ring="swipe_up">R1 ← safer / inquisitive</button><button data-ring="press">R1 switch axis</button><button data-ring="swipe_down">R1 riskier / declarative →</button><button data-ring="double_press">R1 stop</button></div></main>
+<div class="controls" style="margin-top:10px"><button data-ring="swipe_up">R1 scroll up</button><button data-ring="press">R1 next axis</button><button data-ring="swipe_down">R1 scroll down</button><button data-ring="double_press">R1 stop</button></div></main>
 <script type="module">
 import {ConversationCopilot,mockSuggestionEngine} from "../src/copilot.js";
 const c=new ConversationCopilot(); c.start(); const screen=document.querySelector("#screen"); const draw=()=>screen.textContent=c.displayLines().join("\n"); draw();

@@ -57,18 +57,19 @@ Do not market phonetics as authoritative pronunciation. Generate transliteration
 
 ### Tone axes and controls
 
-- **Stance:** `0` inquisitive ↔ `7` declarative.
-- **Risk:** `0` safe ↔ `7` risky, with integer intervals between. “Risky” means socially bold or vulnerable, never unsafe, deceptive, coercive, illegal, or boundary-violating.
-- Press: switch the active axis (`[S]` stance or `[R]` risk in the header).
-- Swipe up: move stance toward inquisitive, or risk toward safe.
-- Swipe down: move stance toward declarative, or risk toward risky.
+- **Persona:** `P` playful ↔ `S` strategic.
+- **Stance:** `I` inquisitive ↔ `D` declarative.
+- **Risk:** integer `1` safe ↔ `7` risky. “Risky” means socially bold or vulnerable, never unsafe, deceptive, coercive, illegal, or boundary-violating.
+- Press: cycle the active axis persona → stance → risk.
+- Swipe either way on persona or stance: toggle its two options.
+- Swipe up/down on risk: decrease/increase the 1–7 value.
 - Double press: end session (matches the platform’s exit convention).
 - Context menu: language, persona, reset tone, pause/resume, mic choice.
 - Phone: full settings, provider choice, vocabulary corrections, transcript deletion.
 
-Tone is session state, not a response selector. Every committed user utterance—including wording unrelated to any suggestion—is appended to the neutral conversation context. The current two-axis values are included in the next provider request; changing tone can also immediately regenerate the current card after a short debounce.
+Tone is session state, not a response selector. Every committed user utterance—including wording unrelated to any suggestion—is appended to the neutral conversation context. The current three-axis values are included at the beginning of the next provider request; changing tone can also immediately regenerate the current card after a short debounce.
 
-Language is backend-detected and session-smoothed; there is no manual language setting in the primary flow. The top lens zone always contains the English translation/transcription of the latest configurable N microphone words. The bottom zone follows immediately without a divider and contains English branches when English is detected, or pronunciation-only English-phonetic branches when another language is detected. The first branch is prefixed with compact status, such as `PL 2/5 • ...` (language, stance, risk).
+Language is backend-detected and session-smoothed; there is no manual language setting in the primary flow. The top lens zone always contains the English translation/transcription of the latest configurable N microphone words. The bottom zone follows immediately without a divider and contains English branches when English is detected, or pronunciation-only English-phonetic branches when another language is detected. The first branch is prefixed with compact status, such as `PL P I 2 • ...` (language, persona, stance, risk); brackets identify the active ring axis.
 
 ## Runtime architecture
 
@@ -203,7 +204,7 @@ Exit: ten scripted conversations meet layout and functional tests; median sugges
 - Every foreign reply contains English, native, and phonetic forms; the display never exceeds seven lines.
 - User-English turn in foreign mode replaces the card with a target-language translation when speaker confidence passes threshold.
 - Unknown speaker never silently triggers the wearer path.
-- Press changes the active tone axis; swipes clamp each axis to integer values 0–7; double press stops capture.
+- Press cycles all three tone axes; scroll toggles persona/stance or clamps risk to 1–7; double press stops capture.
 - No reply-selection state exists, and the next user utterance threads correctly whether or not it resembles a suggestion.
 - Late provider responses cannot overwrite a newer turn (monotonic `turnId`).
 - Invalid/oversized JSON is rejected and replaced with a safe status card.
