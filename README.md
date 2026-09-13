@@ -24,9 +24,9 @@ Then open `http://localhost:4173`.
 
 ## Android settings app
 
-The native app under `app/` configures OpenAI, xAI/Grok, and Gemini independently. API keys are encrypted using a non-exportable Android Keystore AES-GCM key. Each connection has an editable model and endpoint plus an on-device connection test.
+The native app under `app/` configures OpenAI, xAI/Grok, and Gemini independently. API keys are encrypted using a non-exportable Android Keystore AES-GCM key. Each connection has an editable model and endpoint plus an on-device connection test. The build uses Android Gradle Plugin 8.9.1 so it can use the installed Build Tools 35.0.0 without requesting Build Tools 36.
 
-Build and deploy from a machine with Android SDK 35 and Gradle available:
+Build and deploy from a machine with Android SDK Platform 35, Build Tools 35, JDK 17+, and Gradle 8.11.1 available:
 
 ```bash
 gradle :app:assembleDebug
@@ -37,6 +37,12 @@ adb shell am start -n com.g2copilot.settings/.MainActivity
 Or run `./deploy-android.sh` to build, verify that the Pixel authorized USB debugging, install, and open the app.
 
 The APK intentionally does not contain provider keys. Enter them on the phone after installation.
+
+On Ubuntu, the complete host prerequisites can be installed with:
+
+```bash
+sudo apt install openjdk-21-jdk-headless google-android-platform-tools-installer google-android-platform-35-installer google-android-build-tools-35.0.0-installer
+```
 
 ## What is real vs mocked
 
