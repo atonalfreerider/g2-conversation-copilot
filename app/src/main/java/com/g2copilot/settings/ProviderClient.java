@@ -8,8 +8,15 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import org.json.JSONObject;
+import org.json.JSONArray;
 
 final class ProviderClient {
+    interface LogSink { void log(String message); }
+    interface Cancellation { boolean cancelled(); void connected(HttpURLConnection connection); }
+    static final class Suggestions {
+        final String language, context; final java.util.List<String> branches;
+        Suggestions(String language,String context,java.util.List<String> branches){this.language=language;this.context=context;this.branches=branches;}
+    }
     static String test(Provider provider, String baseUrl, String model, String apiKey) throws Exception {
         if (apiKey.trim().isEmpty()) throw new IllegalArgumentException("Enter an API key first.");
         URL url; JSONObject body = new JSONObject();
@@ -30,6 +37,39 @@ final class ProviderClient {
         String response = read(stream);
         if (code < 200 || code >= 300) throw new IllegalStateException("HTTP " + code + ": " + safeMessage(response));
         return "Connected · HTTP " + code;
+    }
+    static Suggestions suggest(Provider provider,String baseUrl,String model,String apiKey,String prompt,LogSink log,Cancellation cancellation) throws Exception {
+        if(apiKey.trim().isEmpty())throw new IllegalArgumentException("Configure the selected provider API key first.");
+        URL url;JSONObject body=new JSONObject();
+        if(provider==Provider.GEMINI){
+            url=new URL(trimSlash(baseUrl)+"/models/"+encodePath(model)+":generateContent");
+            body.put("contents",new JSONArray().put(new JSONObject().put("parts",new JSONArray().put(new JSONObject().put("text",prompt)))));
+            body.put("generationConfig",new JSONObject().put("responseMimeType","application/json").put("temperature",0.85));
+        }else{
+            url=new URL(trimSlash(baseUrl)+"/chat/completions");body.put("model",model);if(provider==Provider.XAI)body.put("temperature",0.85);
+            body.put(provider==Provider.OPENAI?"max_completion_tokens":"max_tokens",220);
+            body.put("messages",new JSONArray().put(new JSONObject().put("role","system").put("content","Return only valid JSON. You are a discreet real-time conversation copilot.")).put(new JSONObject().put("role","user").put("content",prompt)));
+            body.put("response_format",new JSONObject().put("type","json_object"));
+            if(provider==Provider.XAI)body.put("stream",true);
+        }
+        String raw=provider==Provider.XAI?postStreamingXai(url,apiKey,body,log,cancellation):post(provider,url,apiKey,body);if(cancellation.cancelled())throw new java.io.IOException("SUPERSEDED");String content;
+        JSONObject envelope=new JSONObject(raw);
+        if(provider==Provider.GEMINI)content=envelope.getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text");
+        else content=envelope.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
+        content=content.trim().replaceFirst("^```(?:json)?\\s*","").replaceFirst("\\s*```$","");JSONObject result=new JSONObject(content);
+        JSONArray values=result.getJSONArray("branches");java.util.List<String> branches=new java.util.ArrayList<>();for(int i=0;i<Math.min(3,values.length());i++)branches.add(values.getString(i));
+        return new Suggestions(result.optString("language","EN").toUpperCase(),result.optString("context",""),branches);
+    }
+    private static String post(Provider provider,URL url,String apiKey,JSONObject body)throws Exception{
+        HttpURLConnection connection=(HttpURLConnection)url.openConnection();connection.setRequestMethod("POST");connection.setConnectTimeout(12_000);connection.setReadTimeout(30_000);connection.setRequestProperty("Content-Type","application/json");
+        if(provider==Provider.GEMINI)connection.setRequestProperty("x-goog-api-key",apiKey);else connection.setRequestProperty("Authorization","Bearer "+apiKey);connection.setDoOutput(true);
+        try(OutputStream output=connection.getOutputStream()){output.write(body.toString().getBytes(StandardCharsets.UTF_8));}int code=connection.getResponseCode();String response=read(code<400?connection.getInputStream():connection.getErrorStream());if(code<200||code>=300)throw new IllegalStateException("HTTP "+code+": "+safeMessage(response));return response;
+    }
+    private static String postStreamingXai(URL url,String apiKey,JSONObject body,LogSink log,Cancellation cancellation)throws Exception{
+        HttpURLConnection connection=(HttpURLConnection)url.openConnection();cancellation.connected(connection);connection.setRequestMethod("POST");connection.setConnectTimeout(12_000);connection.setReadTimeout(20_000);connection.setRequestProperty("Content-Type","application/json");connection.setRequestProperty("Accept","text/event-stream");connection.setRequestProperty("Authorization","Bearer "+apiKey);connection.setDoOutput(true);
+        try(OutputStream output=connection.getOutputStream()){output.write(body.toString().getBytes(StandardCharsets.UTF_8));}int code=connection.getResponseCode();if(code<200||code>=300)throw new IllegalStateException("HTTP "+code+": "+safeMessage(read(connection.getErrorStream())));
+        StringBuilder content=new StringBuilder();try(BufferedReader reader=new BufferedReader(new InputStreamReader(connection.getInputStream(),StandardCharsets.UTF_8))){for(String line;(line=reader.readLine())!=null;){if(cancellation.cancelled())throw new java.io.IOException("SUPERSEDED");if(!line.startsWith("data:"))continue;String data=line.substring(5).trim();if("[DONE]".equals(data)){if(log!=null)log.log("SSE ← [DONE]");break;}JSONObject event=new JSONObject(data);JSONArray choices=event.optJSONArray("choices");if(choices==null||choices.length()==0)continue;JSONObject deltaObject=choices.getJSONObject(0).optJSONObject("delta");if(deltaObject!=null){String delta=deltaObject.optString("content","");content.append(delta);if(log!=null&&!delta.isEmpty())log.log("SSE ← "+delta);}}}
+        return new JSONObject().put("choices",new JSONArray().put(new JSONObject().put("message",new JSONObject().put("content",content.toString())))).toString();
     }
     private static String trimSlash(String value) { return value.endsWith("/") ? value.substring(0,value.length()-1) : value; }
     private static String encodePath(String value) { return value.replace("/", "%2F").replace(" ", "%20"); }

@@ -69,7 +69,15 @@ The APK intentionally does not contain provider keys. Enter them on the phone af
 
 ### Pixel glasses simulator
 
-Tap **Open glasses simulator** in the Android app to test without G2 hardware. It includes a lens-sized preview, live Pixel microphone transcription with partial updates, typed input fallback, automatic mock language detection, English versus phonetic branches, and on-screen R1 scroll/press controls. Android requests microphone permission the first time **Start microphone** is tapped. Speech recognition uses the recognition service configured on the phone; provider calls remain separate.
+Tap **Open glasses simulator** in the Android app to test without G2 hardware. It includes a lens-sized preview, live Pixel microphone transcription with partial updates, typed input fallback, a speech-language selector, and on-screen R1 scroll/press controls. Provider updates are event-driven: a snapshot is sent after speech briefly settles or Android emits a final recognition result. Requests include the complete rolling thread and current P/S, I/D, and risk controls.
+
+Choose **Polish**, **Russian**, or **Chinese** before speaking that language. This passes the corresponding locale to Android speech recognition (`pl-PL`, `ru-RU`, or `zh-CN`) and prevents Google Speech from forcing foreign speech into English homonyms. **Auto** uses the phone's default recognition locale and asks the LLM to detect language after transcription, so it cannot recover foreign words that the speech recognizer has already mistranscribed.
+
+The lens reserves three fixed-height regions: English context at the top, then branch one and branch two. Translation mode shows only the English translation in the top region—there is no “they said” label or placeholder. Text wraps within its region and automatically scales down instead of being truncated, while fixed region heights prevent other content from jumping. Partial microphone results continue accumulating off-screen and trigger provider snapshots, but the lens commits only complete response objects, so suggestions change as stable chunks rather than token-by-token. xAI requests use SSE streaming with a longer read timeout; streamed deltas are assembled off-screen and atomically committed only after valid JSON is complete.
+
+A live provider log appears below the simulator. It shows outbound transcript snapshots and control settings, incoming xAI SSE chunks, completed parsed responses, and network or parsing errors. API keys and authorization headers are never written to the log.
+
+Each outbound snapshot has a generation number. When newer microphone text arrives, the previous HTTP connection is actively disconnected and its result discarded, its branches are removed, and only the newest generation may update the lens. xAI requests have finite connection and read deadlines, so a silent stream cannot wait forever. For English speech, the top region is the exact rolling microphone word window; the provider cannot replace it with a paraphrase. For foreign speech, the newest successful provider generation supplies the English translation.
 
 On Ubuntu, the complete host prerequisites can be installed with:
 
@@ -80,7 +88,7 @@ sudo apt install openjdk-21-jdk-headless google-android-platform-tools-installer
 ## What is real vs mocked
 
 - Real: conversation state, rendering policy, word-windowing, ring actions, provider-neutral request/response contract, privacy state.
-- Mocked: speech recognition, speaker identification, translation, phonetics, and LLM network calls.
+- Mocked in the browser: speech recognition, speaker identification, translation, phonetics, and LLM network calls. The Android simulator uses the Pixel's real speech-recognition service and the configured provider for translation, phonetics, and branches.
 - Hardware adapter: `src/even-adapter.ts` documents the narrow boundary to implement with `@evenrealities/even_hub_sdk` after testing on the shipped G2/R1.
 
 See [TECHNICAL_PLAN.md](./TECHNICAL_PLAN.md) for researched capabilities, architecture, rollout, and acceptance tests.
