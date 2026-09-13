@@ -53,7 +53,7 @@ Then open `http://localhost:4173`.
 
 ## Android settings app
 
-The native app under `app/` configures OpenAI, xAI/Grok, and Gemini independently. API keys are encrypted using a non-exportable Android Keystore AES-GCM key. Each connection has an editable model and endpoint plus an on-device connection test. The build uses Android Gradle Plugin 8.9.1 so it can use the installed Build Tools 35.0.0 without requesting Build Tools 36.
+The native app under `app/` configures OpenAI, xAI/Grok, cloud Gemini, and Gemini Nano independently. API keys are encrypted using a non-exportable Android Keystore AES-GCM key. Cloud connections have an editable model and endpoint plus a connection test. **Gemini Nano · on-device** uses the Pixel's shared AICore model through ML Kit Prompt API and requires no developer API key. The build uses Android Gradle Plugin 8.9.1 so it can use the installed Build Tools 35.0.0 without requesting Build Tools 36.
 
 Build and deploy from a machine with Android SDK Platform 35, Build Tools 35, JDK 17+, and Gradle 8.11.1 available:
 
@@ -70,6 +70,8 @@ The APK intentionally does not contain provider keys. Enter them on the phone af
 ### Pixel glasses simulator
 
 Tap **Open glasses simulator** in the Android app to test without G2 hardware. It includes a lens-sized preview, live Pixel microphone transcription with partial updates, typed input fallback, a speech-language selector, and on-screen R1 scroll/press controls. Provider updates are event-driven: a snapshot is sent after speech briefly settles or Android emits a final recognition result. Requests include the complete rolling thread and current P/S, I/D, and risk controls.
+
+The backend can be switched from either the main settings screen or the selector inside the simulator. Selecting a backend makes it active immediately. The Gemini choices are deliberately separate: **Gemini Nano · on-device** is private, offline-capable, and keyless; **Google Gemini** is the cloud API and still requires a key.
 
 Choose **Polish**, **Russian**, or **Chinese** before speaking that language. This passes the corresponding locale to Android speech recognition (`pl-PL`, `ru-RU`, or `zh-CN`) and prevents Google Speech from forcing foreign speech into English homonyms. **Auto** uses the phone's default recognition locale and asks the LLM to detect language after transcription, so it cannot recover foreign words that the speech recognizer has already mistranscribed.
 

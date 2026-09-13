@@ -30,6 +30,7 @@ final class SecureSettings {
     String model(Provider p) { return prefs.getString(p.name()+"_model", p.defaultModel); }
     String url(Provider p) { return prefs.getString(p.name()+"_url", p.defaultUrl); }
     Provider activeProvider() { try { return Provider.valueOf(prefs.getString("active_provider",Provider.OPENAI.name())); } catch(Exception ignored) { return Provider.OPENAI; } }
+    void setActiveProvider(Provider provider) { prefs.edit().putString("active_provider",provider.name()).apply(); }
 
     private SecretKey secretKey() throws Exception {
         KeyStore store = KeyStore.getInstance("AndroidKeyStore"); store.load(null);
