@@ -4,6 +4,8 @@
   "type": "module",
   "scripts": {
     "demo": "node server.mjs",
-    "test": "node --test"
+    "test": "node --test",
+    "test:live:openai": "node scripts/live-provider-smoke.mjs openai /home/john/Documents/oai-key",
+    "test:live:xai": "node scripts/live-provider-smoke.mjs xai /home/john/Documents/xAI-Key"
   }
 }

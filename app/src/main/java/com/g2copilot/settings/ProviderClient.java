@@ -58,8 +58,8 @@ final class ProviderClient {
         if(provider==Provider.GEMINI)content=envelope.getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text");
         else content=envelope.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
         content=content.trim().replaceFirst("^```(?:json)?\\s*","").replaceFirst("\\s*```$","");JSONObject result=new JSONObject(content);
-        JSONArray values=result.getJSONArray("branches");java.util.List<String> branches=new java.util.ArrayList<>();for(int i=0;i<Math.min(3,values.length());i++)branches.add(values.getString(i));
-        return new Suggestions(result.optString("language","EN").toUpperCase(),result.optString("context",""),branches);
+        String detected=result.optString("language","EN").toUpperCase();JSONArray values=result.getJSONArray("branches");java.util.List<String> branches=new java.util.ArrayList<>();for(int i=0;i<Math.min(3,values.length());i++){Object item=values.get(i);if(item instanceof JSONObject){JSONObject branch=(JSONObject)item;String english=branch.optString("english","").trim();String phonetic=OutputSanitizer.cleanPhonetic(branch.optString("phonetic",""));branches.add("EN".equals(detected)||phonetic.isEmpty()?english:english+"\n"+phonetic);}else branches.add(OutputSanitizer.cleanPhonetic(String.valueOf(item)));}
+        return new Suggestions(detected,OutputSanitizer.cleanTranslation(result.optString("context","")),branches);
     }
     private static String post(Provider provider,URL url,String apiKey,JSONObject body)throws Exception{
         HttpURLConnection connection=(HttpURLConnection)url.openConnection();connection.setRequestMethod("POST");connection.setConnectTimeout(12_000);connection.setReadTimeout(30_000);connection.setRequestProperty("Content-Type","application/json");

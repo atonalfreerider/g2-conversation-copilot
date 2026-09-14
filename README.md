@@ -67,6 +67,8 @@ Or run `./deploy-android.sh` to build, verify that the Pixel authorized USB debu
 
 The APK intentionally does not contain provider keys. Enter them on the phone after installation.
 
+The **Speaker biography** field stores the user's self-description locally on the phone. Every provider prompt includes it as point-of-view context so branches sound like something that user might plausibly say. It is never treated as permission to invent additional biographical facts.
+
 ### Pixel glasses simulator
 
 Tap **Open glasses simulator** in the Android app to test without G2 hardware. It includes a lens-sized preview, live Pixel microphone transcription with partial updates, typed input fallback, a speech-language selector, and on-screen R1 scroll/press controls. Provider updates are event-driven: a snapshot is sent after speech briefly settles or Android emits a final recognition result. Requests include the complete rolling thread and current P/S, I/D, and risk controls.
@@ -77,13 +79,25 @@ The default xAI model is `grok-4.20-0309-non-reasoning`, selected for conversati
 
 Choose **Polish**, **Russian**, or **Chinese** before speaking that language. This passes the corresponding locale to Android speech recognition (`pl-PL`, `ru-RU`, or `zh-CN`) and prevents Google Speech from forcing foreign speech into English homonyms. **Auto** uses the phone's default recognition locale and asks the LLM to detect language after transcription, so it cannot recover foreign words that the speech recognizer has already mistranscribed.
 
-The lens reserves three fixed-height regions: English context at the top, then branch one and branch two. Translation mode shows only the English translation in the top region—there is no “they said” label or placeholder. Text wraps within its region and automatically scales down instead of being truncated, while fixed region heights prevent other content from jumping. Partial microphone results continue accumulating off-screen and trigger provider snapshots, but the lens commits only complete response objects, so suggestions change as stable chunks rather than token-by-token. xAI requests use SSE streaming with a longer read timeout; streamed deltas are assembled off-screen and atomically committed only after valid JSON is complete.
+The lens reserves three fixed-height regions: English context at the top, then branch one and branch two. Translation mode shows only the English translation in the top region—there is no “they said” label or placeholder. Each foreign-language branch shows its English meaning on the first line and stupidly simple phonetic pronunciation directly beneath it. Text wraps within its region and automatically scales down instead of being truncated, while fixed region heights prevent other content from jumping. Partial microphone results continue accumulating off-screen and trigger provider snapshots, but the lens commits only complete response objects, so suggestions change as stable chunks rather than token-by-token. xAI requests use SSE streaming with a longer read timeout; streamed deltas are assembled off-screen and atomically committed only after valid JSON is complete.
 
 A live provider log appears below the simulator. It shows outbound transcript snapshots and control settings, incoming xAI SSE chunks, completed parsed responses, and network or parsing errors. API keys and authorization headers are never written to the log.
 
 The provider-status row distinguishes connection setup, request upload, waiting for HTTP, active SSE streaming, completion, supersession, errors, and timeout. It also shows elapsed seconds while work is active. Every provider operation has a 30-second whole-request deadline, including xAI streams that might otherwise keep a socket alive indefinitely.
 
 Each outbound snapshot has a generation number. When newer microphone text arrives, the previous HTTP connection is actively disconnected and its result discarded, its branches are removed, and only the newest generation may update the lens. xAI requests have finite connection and read deadlines, so a silent stream cannot wait forever. For English speech, the top region is the exact rolling microphone word window; the provider cannot replace it with a paraphrase. For foreign speech, the newest successful provider generation supplies the English translation.
+
+## Tests
+
+`npm test` runs deterministic state-machine, provider-contract, risk, biography, clean-translation, and phonetic-policy tests. Android JVM tests under `app/src/test` verify the native prompt and output sanitizer, including `Dzień dobry` → `Teen Doe Bray`.
+
+Live smoke tests read keys directly from the supplied files and never copy them into the repository or print them:
+
+```bash
+npm run test:live:openai
+npm run test:live:xai
+gradle :app:testDebugUnitTest
+```
 
 On Ubuntu, the complete host prerequisites can be installed with:
 

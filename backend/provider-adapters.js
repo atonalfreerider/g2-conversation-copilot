@@ -12,7 +12,7 @@ async function responses(config, prompt, fetchImpl) {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.apiKey}` },
     body: JSON.stringify({
-      model: config.model, input: prompt, store: false, max_output_tokens: 300,
+      model: config.model, input: prompt, store: false, max_output_tokens: 600,
       text: { format: { type: "json_schema", name: "suggestion_card", strict: true, schema: suggestionSchema } },
     }),
   });
@@ -37,6 +37,7 @@ async function gemini(config, prompt, fetchImpl) {
 export function validateCard(card) {
   if (!card || !/^[A-Z]{2}$/.test(card.detectedLanguage) || typeof card.englishContext !== "string" || !Array.isArray(card.replies)) throw new Error("Provider returned an invalid card");
   if (card.replies.length < 1 || card.replies.length > 3) throw new Error("Provider returned the wrong number of branches");
+  if (/^(user|they|speaker)\s+(said|says)\s*:/i.test(card.englishContext) || /\b(?:friendly )?(?:polish|russian|chinese) greeting\b/i.test(card.englishContext)) throw new Error("Provider polluted the clean English translation");
   return card;
 }
 

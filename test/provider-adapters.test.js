@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { generateSuggestion } from "../backend/provider-adapters.js";
 
-const request = { mode:"playful", tone:{stance:"inquisitive",risk:4}, contextWordCount:20, rollingText:"hello", latestText:"hello" };
+const request = { mode:"playful", tone:{stance:"inquisitive",risk:4}, biography:"I am a curious designer.", contextWordCount:20, rollingText:"hello", latestText:"hello" };
 const card = { detectedLanguage:"EN", englishContext:"hello", replies:[{english:"Hi."}] };
 
 test("OpenAI and xAI use Responses with bearer auth and schema", async () => {
@@ -14,6 +14,12 @@ test("OpenAI and xAI use Responses with bearer auth and schema", async () => {
     assert.equal(call.options.headers.Authorization,"Bearer secret");
     assert.equal(JSON.parse(call.options.body).text.format.type,"json_schema");
   }
+});
+
+test("rejects polluted translation commentary", async () => {
+  const polluted={...card,englishContext:"User said: Hello — a Polish friendly greeting"};
+  const fake=async()=>({ok:true,json:async()=>({output_text:JSON.stringify(polluted)})});
+  await assert.rejects(()=>generateSuggestion("openai",{baseUrl:"https://openai.test/v1",model:"model",apiKey:"secret"},request,fake),/polluted/);
 });
 
 test("Gemini uses API-key header and JSON schema", async () => {

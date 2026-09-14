@@ -20,7 +20,7 @@ final class OnDeviceGeminiClient {
         }else if(status!=FeatureStatus.AVAILABLE)throw new IllegalStateException("Gemini Nano is unavailable in AICore on this Pixel");
         if(log!=null)log.log("Nano ← generating locally (no API key)");
         GenerateContentResponse response=model.generateContent(prompt).get(45,TimeUnit.SECONDS);
-        String raw=response.getCandidates().get(0).getText().trim().replaceFirst("^```(?:json)?\\s*","").replaceFirst("\\s*```$","");JSONObject result=new JSONObject(raw);JSONArray values=result.getJSONArray("branches");java.util.List<String> branches=new java.util.ArrayList<>();for(int i=0;i<Math.min(3,values.length());i++)branches.add(values.getString(i));
-        return new ProviderClient.Suggestions(result.optString("language","EN").toUpperCase(),result.optString("context",""),branches);
+        String raw=response.getCandidates().get(0).getText().trim().replaceFirst("^```(?:json)?\\s*","").replaceFirst("\\s*```$","");JSONObject result=new JSONObject(raw);String detected=result.optString("language","EN").toUpperCase();JSONArray values=result.getJSONArray("branches");java.util.List<String> branches=new java.util.ArrayList<>();for(int i=0;i<Math.min(3,values.length());i++){Object item=values.get(i);if(item instanceof JSONObject){JSONObject branch=(JSONObject)item;String english=branch.optString("english","").trim();String phonetic=OutputSanitizer.cleanPhonetic(branch.optString("phonetic",""));branches.add("EN".equals(detected)||phonetic.isEmpty()?english:english+"\n"+phonetic);}else branches.add(OutputSanitizer.cleanPhonetic(String.valueOf(item)));}
+        return new ProviderClient.Suggestions(detected,OutputSanitizer.cleanTranslation(result.optString("context","")),branches);
     }
 }

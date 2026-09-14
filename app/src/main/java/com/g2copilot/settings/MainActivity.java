@@ -5,13 +5,15 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.text.InputType;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.View;
 import android.widget.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public final class MainActivity extends Activity {
-    private SecureSettings settings; private Spinner provider, persona, stance; private EditText apiKey, model, endpoint, words;
+    private SecureSettings settings; private Spinner provider, persona, stance; private EditText apiKey, model, endpoint, words, biography;
     private SeekBar risk; private TextView status, riskValue; private Button test;
     private final ExecutorService network = Executors.newSingleThreadExecutor();
 
@@ -26,6 +28,8 @@ public final class MainActivity extends Activity {
         model=input("Model"); endpoint=input("API endpoint"); root.addView(model); root.addView(endpoint);
         LinearLayout actions=new LinearLayout(this); test=button("Test connection"); Button save=button("Save securely"); actions.addView(test); actions.addView(save); root.addView(actions);
         root.addView(label("Glasses defaults")); words=input("Context words"); words.setInputType(InputType.TYPE_CLASS_NUMBER); words.setText("20"); root.addView(words);
+        root.addView(label("Speaker biography"));biography=input("Describe yourself, your voice, interests, and point of view");biography.setSingleLine(false);biography.setMinLines(3);biography.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE|InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);biography.setText(getSharedPreferences("profile",MODE_PRIVATE).getString("biography",""));root.addView(biography);
+        biography.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void onTextChanged(CharSequence s,int start,int before,int count){getSharedPreferences("profile",MODE_PRIVATE).edit().putString("biography",s.toString()).apply();}public void afterTextChanged(Editable e){}});
         root.addView(label("Persona (P/S)")); persona=choice("Playful (P)","Strategic (S)"); root.addView(persona);
         root.addView(label("Stance (I/D)")); stance=choice("Inquisitive (I)","Declarative (D)"); root.addView(stance);
         riskValue=label(""); root.addView(riskValue); risk=slider(); root.addView(risk);
@@ -33,7 +37,7 @@ public final class MainActivity extends Activity {
         Button simulator=button("Open glasses simulator"); root.addView(simulator);
         provider.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){ public void onItemSelected(AdapterView<?> p,View v,int pos,long id){Provider chosen=Provider.values()[pos];settings.setActiveProvider(chosen);load(chosen);boolean cloud=chosen!=Provider.GEMINI_NANO;apiKey.setEnabled(cloud);model.setEnabled(cloud);endpoint.setEnabled(cloud);test.setText(cloud?"Test connection":"Check Gemini Nano");} public void onNothingSelected(AdapterView<?> p){} });
         risk.setOnSeekBarChangeListener(listener(()->updateTone())); updateTone();
-        save.setOnClickListener(v->saveConnection()); test.setOnClickListener(v->testConnection()); saveDefaults.setOnClickListener(v->{getPreferences(MODE_PRIVATE).edit().putInt("words",number(words,20)).putString("persona",persona.getSelectedItemPosition()==0?"P":"S").putString("stance",stance.getSelectedItemPosition()==0?"I":"D").putInt("risk",risk.getProgress()).apply(); show("Defaults saved");});
+        save.setOnClickListener(v->saveConnection()); test.setOnClickListener(v->testConnection()); saveDefaults.setOnClickListener(v->{getPreferences(MODE_PRIVATE).edit().putInt("words",number(words,20)).putString("persona",persona.getSelectedItemPosition()==0?"P":"S").putString("stance",stance.getSelectedItemPosition()==0?"I":"D").putInt("risk",risk.getProgress()).apply();getSharedPreferences("profile",MODE_PRIVATE).edit().putString("biography",biography.getText().toString().trim()).apply();show("Defaults and biography saved on phone");});
         simulator.setOnClickListener(v->startActivity(new Intent(this,SimulatorActivity.class)));
         return scroll;
     }

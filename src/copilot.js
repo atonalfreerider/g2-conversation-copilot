@@ -61,8 +61,9 @@ export class ConversationCopilot {
     const status = `${s.detectedLanguage} ${tokens.persona} ${tokens.stance} ${tokens.risk}`;
     const lines = [s.card.englishContext];
     s.card.replies.forEach((r, index) => {
-      const branch = `• ${foreign ? r.phonetic : r.english}`;
+      const branch = `• ${r.english}`;
       lines.push(index === 0 ? `${status} ${branch}` : branch);
+      if (foreign && r.phonetic) lines.push(`  ${r.phonetic}`);
     });
     const visible = lines.slice(0, 7);
     if (s.card.replies.length === 0) visible[0] = `${status} ${visible[0]}`;
@@ -83,11 +84,11 @@ export function mockSuggestionEngine(req) {
     return { detectedLanguage, englishContext: lastWords(req.latestText, req.contextWordCount), replies: replies.map(english => ({ english })) };
   }
   if (req.userWentOffScript) return {
-    detectedLanguage, englishContext: `YOU SAID: ${lastWords(req.latestText, req.contextWordCount)}`,
+    detectedLanguage, englishContext: lastWords(req.latestText, req.contextWordCount),
     replies: [{ english: req.latestText, phonetic: "mock phonetic translation" }],
   };
   return {
-    detectedLanguage, englishContext: `THEY SAID: ${mockEnglishTranslation(req.latestText, detectedLanguage)}`,
+    detectedLanguage, englishContext: mockEnglishTranslation(req.latestText, detectedLanguage),
     replies: [
       { english: "Tell me more.", phonetic: "mock: tell me more" },
       { english: "That sounds wonderful.", phonetic: "mock: sounds wonderful" },

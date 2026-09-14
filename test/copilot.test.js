@@ -12,7 +12,7 @@ test("foreign off-script English becomes a phonetic branch", () => {
   const c = new ConversationCopilot(); c.start();
   c.ingest({ speaker: "other", language: "unknown", text: "Cześć, miło cię poznać" }, mockSuggestionEngine);
   c.ingest({ speaker: "user", language: "English", text: "I would love to visit Warsaw" }, mockSuggestionEngine);
-  assert.match(c.displayLines().join("\n"), /YOU SAID/);
+  assert.doesNotMatch(c.displayLines().join("\n"), /YOU SAID/);
   assert.match(c.displayLines().join("\n"), /mock phonetic translation/);
 });
 
@@ -29,11 +29,11 @@ test("ring cycles persona, stance, and 1-7 risk axes", () => {
   c.ring("double_press"); assert.equal(c.state.listening, false);
 });
 
-test("language is automatic and foreign branches display phonetics only", () => {
+test("foreign branches display English above phonetics", () => {
   const c = new ConversationCopilot(); c.start();
   c.ingest({ speaker: "other", language: "unknown", text: "Привет, как дела сегодня?" }, mockSuggestionEngine);
   assert.equal(c.state.detectedLanguage, "RU");
   const display = c.displayLines().join("\n");
-  assert.match(display, /THEY SAID: Hello/); assert.match(display, /mock: tell me more/);
-  assert.doesNotMatch(display, /Tell me more\./); assert.match(c.displayLines()[1], /^RU \[P\] I 4 •/);
+  assert.match(display, /^Hello/m); assert.match(display, /Tell me more\.\n  mock: tell me more/);
+  assert.doesNotMatch(display, /THEY SAID/); assert.match(c.displayLines()[1], /^RU \[P\] I 4 •/);
 });
