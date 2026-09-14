@@ -2,7 +2,7 @@ package com.g2copilot.settings;
 
 public enum Provider {
     OPENAI("OpenAI", "https://api.openai.com/v1", "gpt-5.2"),
-    XAI("xAI / Grok", "https://api.x.ai/v1", "grok-4.6"),
+    XAI("xAI / Grok", "https://api.x.ai/v1", "grok-4.20-0309-non-reasoning"),
     GEMINI_NANO("Gemini Nano · on-device", "on-device://aicore", "gemini-nano"),
     GEMINI("Google Gemini", "https://generativelanguage.googleapis.com/v1beta", "gemini-3.8-flash");
 

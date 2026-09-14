@@ -27,7 +27,7 @@ final class SecureSettings {
         String value = prefs.getString(p.name()+"_key", "");
         return value.isEmpty() ? "" : decrypt(Base64.decode(value, Base64.NO_WRAP));
     }
-    String model(Provider p) { return prefs.getString(p.name()+"_model", p.defaultModel); }
+    String model(Provider p) { String saved=prefs.getString(p.name()+"_model",p.defaultModel);return p==Provider.XAI&&"grok-4.6".equals(saved)?p.defaultModel:saved; }
     String url(Provider p) { return prefs.getString(p.name()+"_url", p.defaultUrl); }
     Provider activeProvider() { try { return Provider.valueOf(prefs.getString("active_provider",Provider.OPENAI.name())); } catch(Exception ignored) { return Provider.OPENAI; } }
     void setActiveProvider(Provider provider) { prefs.edit().putString("active_provider",provider.name()).apply(); }
