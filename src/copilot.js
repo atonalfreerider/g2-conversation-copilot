@@ -8,7 +8,7 @@ export class ConversationCopilot {
   constructor({ contextWordCount = 20, mode = Mode.PLAYFUL } = {}) {
     this.state = {
       detectedLanguage: "EN", contextWordCount, mode, listening: false,
-      tone: { focus: "persona", stance: "inquisitive", risk: 4 }, transcript: [],
+      tone: { focus: 0, stance: "inquisitive", risk: 4 }, transcript: [], viewport: 0,
       card: { detectedLanguage: "EN", englishContext: "Ready", replies: [] },
     };
   }
@@ -36,14 +36,16 @@ export class ConversationCopilot {
 
   ring(action) {
     const tone = this.state.tone;
-    if (action === "press") {
-      const axes = ["persona", "stance", "risk"];
-      tone.focus = axes[(axes.indexOf(tone.focus) + 1) % axes.length];
-    }
     if (action === "swipe_down" || action === "swipe_up") {
-      if (tone.focus === "persona") this.toggleMode();
-      if (tone.focus === "stance") tone.stance = tone.stance === "inquisitive" ? "declarative" : "inquisitive";
-      if (tone.focus === "risk") tone.risk = Math.max(1, Math.min(7, tone.risk + (action === "swipe_down" ? 1 : -1)));
+      const max = 2 + Math.min(6, this.state.card.replies.length);
+      tone.focus = Math.max(0, Math.min(max, tone.focus + (action === "swipe_down" ? 1 : -1)));
+      if (tone.focus >= 3) this.state.viewport = Math.max(0, Math.min(4, tone.focus - 3));
+    }
+    if (action === "press") {
+      if (tone.focus === 0) this.toggleMode();
+      if (tone.focus === 1) tone.stance = tone.stance === "inquisitive" ? "declarative" : "inquisitive";
+      if (tone.focus === 2) tone.risk = tone.risk === 7 ? 1 : tone.risk + 1;
+      if (tone.focus >= 3) this.state.spokenBranch = tone.focus - 3;
     }
     if (action === "double_press") this.stop();
     return this.snapshot();
@@ -57,15 +59,16 @@ export class ConversationCopilot {
       stance: s.tone.stance === "inquisitive" ? "I" : "D",
       risk: String(s.tone.risk),
     };
-    tokens[s.tone.focus] = `[${tokens[s.tone.focus]}]`;
+    const axis = ["persona", "stance", "risk"][s.tone.focus]; if (axis) tokens[axis] = `[${tokens[axis]}]`;
     const status = `${s.detectedLanguage} ${tokens.persona} ${tokens.stance} ${tokens.risk}`;
     const lines = [s.card.englishContext];
-    s.card.replies.forEach((r, index) => {
-      const branch = `• ${r.english}`;
+    s.card.replies.slice(s.viewport, s.viewport + 2).forEach((r, localIndex) => {
+      const index = s.viewport + localIndex;
+      const branch = `${s.tone.focus === index + 3 ? ">" : "•"} ${r.english}`;
       lines.push(index === 0 ? `${status} ${branch}` : branch);
       if (foreign && r.phonetic) lines.push(`  ${r.phonetic}`);
     });
-    const visible = lines.slice(0, 7);
+    const visible = lines;
     if (s.card.replies.length === 0) visible[0] = `${status} ${visible[0]}`;
     return visible;
   }
@@ -80,18 +83,22 @@ export function mockSuggestionEngine(req) {
     const declarative = req.mode === Mode.PLAYFUL ? "Okay, that has a story." : "That sounds important to you.";
     const lead = req.tone.stance === "inquisitive" ? inquisitive : declarative;
     const edge = req.tone.risk >= 5 ? "Here’s the bold take." : req.tone.risk <= 2 ? "We can take this slowly." : "I’m with you.";
-    const replies = [lead, edge, req.tone.stance === "inquisitive" ? "And then what happened?" : "I see where you’re coming from."];
+    const replies = [lead, edge, req.tone.stance === "inquisitive" ? "And then what happened?" : "I see where you’re coming from.","Tell me the part you remember most.","That changes how I see it.","What would you do differently now?"];
     return { detectedLanguage, englishContext: lastWords(req.latestText, req.contextWordCount), replies: replies.map(english => ({ english })) };
   }
   if (req.userWentOffScript) return {
     detectedLanguage, englishContext: lastWords(req.latestText, req.contextWordCount),
-    replies: [{ english: req.latestText, phonetic: "mock phonetic translation" }],
+    replies: Array.from({length:6},(_,i)=>({ english: i ? `Option ${i+1}` : req.latestText, phonetic: i ? `mock option ${i+1}` : "mock phonetic translation" })),
   };
   return {
     detectedLanguage, englishContext: mockEnglishTranslation(req.latestText, detectedLanguage),
     replies: [
       { english: "Tell me more.", phonetic: "mock: tell me more" },
       { english: "That sounds wonderful.", phonetic: "mock: sounds wonderful" },
+      { english: "What is your name?", phonetic: "mock: what is your name" },
+      { english: "Where are you from?", phonetic: "mock: where are you from" },
+      { english: "Please say that again.", phonetic: "mock: say it again" },
+      { english: "It is nice to meet you.", phonetic: "mock: nice to meet you" },
     ],
   };
 }

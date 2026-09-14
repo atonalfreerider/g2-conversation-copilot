@@ -14,8 +14,8 @@ final class ProviderClient {
     interface LogSink { void log(String message); }
     interface Cancellation { boolean cancelled(); void connected(HttpURLConnection connection); }
     static final class Suggestions {
-        final String language, context; final java.util.List<String> branches;
-        Suggestions(String language,String context,java.util.List<String> branches){this.language=language;this.context=context;this.branches=branches;}
+        final String language, context; final java.util.List<Branch> branches;
+        Suggestions(String language,String context,java.util.List<Branch> branches){this.language=language;this.context=context;this.branches=branches;}
     }
     static String test(Provider provider, String baseUrl, String model, String apiKey) throws Exception {
         if (apiKey.trim().isEmpty()) throw new IllegalArgumentException("Enter an API key first.");
@@ -58,8 +58,7 @@ final class ProviderClient {
         if(provider==Provider.GEMINI)content=envelope.getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text");
         else content=envelope.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
         content=content.trim().replaceFirst("^```(?:json)?\\s*","").replaceFirst("\\s*```$","");JSONObject result=new JSONObject(content);
-        String detected=result.optString("language","EN").toUpperCase();JSONArray values=result.getJSONArray("branches");if(values.length()!=2)throw new IllegalStateException("Provider must return exactly two branches");java.util.List<String> branches=new java.util.ArrayList<>();for(int i=0;i<2;i++){JSONObject branch=values.optJSONObject(i);if(branch==null)throw new IllegalStateException("Provider returned legacy phonetic-only branch");String english=oneLine(branch.optString("english",""));String phonetic=oneLine(OutputSanitizer.cleanPhonetic(branch.optString("phonetic","")));if(english.isEmpty())throw new IllegalStateException("English branch is required");if(!"EN".equals(detected)&&phonetic.isEmpty())throw new IllegalStateException("Foreign branch requires both English and phonetic");if(log!=null&&(english.length()>36||phonetic.length()>36))log.log("WARN branch exceeded 36-char G2 target; preserving complete sentence");branches.add("EN".equals(detected)?english:english+"\n"+phonetic);}
-        return new Suggestions(detected,OutputSanitizer.cleanTranslation(result.optString("context","")),branches);
+        String detected=result.optString("language","EN").toUpperCase();JSONArray values=result.getJSONArray("branches");if(values.length()<1)throw new IllegalStateException("Provider returned no branches");java.util.List<Branch> branches=new java.util.ArrayList<>();for(int i=0;i<Math.min(6,values.length());i++){JSONObject branch=values.optJSONObject(i);if(branch==null)throw new IllegalStateException("Provider returned legacy phonetic-only branch");String english=oneLine(branch.optString("english",""));String phonetic=oneLine(OutputSanitizer.cleanPhonetic(branch.optString("phonetic","")));if(english.isEmpty())throw new IllegalStateException("English branch is required");if(!"EN".equals(detected)&&phonetic.isEmpty())throw new IllegalStateException("Foreign branch requires both English and phonetic");if(log!=null&&(english.length()>72||phonetic.length()>72))log.log("WARN branch exceeded two-line G2 target");branches.add(new Branch(english,phonetic));}int seed=branches.size();for(int i=0;branches.size()<6;i++)branches.add(branches.get(i%seed));return new Suggestions(detected,OutputSanitizer.cleanTranslation(result.optString("context","")),branches);
     }
     private static String post(Provider provider,URL url,String apiKey,JSONObject body)throws Exception{
         HttpURLConnection connection=(HttpURLConnection)url.openConnection();connection.setRequestMethod("POST");connection.setConnectTimeout(12_000);connection.setReadTimeout(30_000);connection.setRequestProperty("Content-Type","application/json");

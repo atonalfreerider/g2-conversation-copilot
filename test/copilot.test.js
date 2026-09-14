@@ -16,16 +16,17 @@ test("foreign off-script English becomes a phonetic branch", () => {
   assert.match(c.displayLines().join("\n"), /mock phonetic translation/);
 });
 
-test("ring cycles persona, stance, and 1-7 risk axes", () => {
+test("ring scroll selects and press mutates or activates", () => {
   const c = new ConversationCopilot(); c.start();
   c.ingest({ speaker: "other", language: "English", text: "I changed careers last year" }, mockSuggestionEngine);
-  c.ring("swipe_down");
+  c.ring("press");
   assert.equal(c.state.mode, "strategic");
-  c.ring("press"); c.ring("swipe_down");
+  c.ring("swipe_down"); c.ring("press");
   assert.equal(c.state.tone.stance, "declarative");
-  c.ring("press"); c.ring("swipe_down"); c.ring("swipe_down");
-  assert.equal(c.state.tone.risk, 6);
-  assert.match(c.displayLines()[1], /^EN S D \[6\] •/);
+  c.ring("swipe_down"); c.state.tone.risk=7; c.ring("press");
+  assert.equal(c.state.tone.risk, 1);
+  assert.match(c.displayLines()[1], /^EN S D \[1\] •/);
+  c.ring("swipe_down"); c.ring("press"); assert.equal(c.state.spokenBranch,0);
   c.ring("double_press"); assert.equal(c.state.listening, false);
 });
 
