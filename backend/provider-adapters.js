@@ -37,7 +37,7 @@ async function gemini(config, prompt, fetchImpl) {
 export function validateCard(card) {
   if (!card || !/^[A-Z]{2}$/.test(card.detectedLanguage) || typeof card.englishContext !== "string" || !Array.isArray(card.replies)) throw new Error("Provider returned an invalid card");
   if (card.replies.length < 1 || card.replies.length > 3) throw new Error("Provider returned the wrong number of branches");
-  for(const reply of card.replies){if(typeof reply.english!=="string"||!reply.english.trim()||reply.english.includes("\n")||reply.english.length>36)throw new Error("Provider violated the one-line English branch contract");if(card.detectedLanguage!=="EN"&&(typeof reply.phonetic!=="string"||!reply.phonetic.trim()||reply.phonetic.includes("\n")||reply.phonetic.length>36))throw new Error("Foreign branch requires both English and one-line phonetic");}
+  for(const reply of card.replies){if(typeof reply.english!=="string"||!reply.english.trim()||reply.english.includes("\n"))throw new Error("Provider violated the one-line English branch contract");if(card.detectedLanguage!=="EN"&&(typeof reply.phonetic!=="string"||!reply.phonetic.trim()||reply.phonetic.includes("\n")||!/[A-Z]{2,}/.test(reply.phonetic)))throw new Error("Foreign branch requires English, phonetic, and uppercase stress");}
   if (/^(user|they|speaker)\s+(said|says)\s*:/i.test(card.englishContext) || /\b(?:friendly )?(?:polish|russian|chinese) greeting\b/i.test(card.englishContext)) throw new Error("Provider polluted the clean English translation");
   return card;
 }

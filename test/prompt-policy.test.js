@@ -13,7 +13,7 @@ test("speaker biography is injected as point-of-view context",()=>{
 });
 
 test("translation is clean and phonetics use English sound chunks",()=>{
-  const value=prompt();assert.match(value,/ONLY a clean English translation/);assert.match(value,/no labels, speaker attribution/);assert.match(value,/Dzień dobry” becomes exactly “Teen Doe Bray/);assert.match(value,/never native spelling or diacritics/);
+  const value=prompt();assert.match(value,/ONLY a clean English translation/);assert.match(value,/no labels, speaker attribution/);assert.match(value,/Dzień dobry” → “TEEN DOE Bray/);assert.match(value,/CAPITALIZE every stressed/);
 });
 
 test("foreign branches require two strict one-line fields",()=>{const value=prompt();assert.match(value,/BOTH english and phonetic are mandatory/);assert.match(value,/one complete line of at most 36 characters/);});

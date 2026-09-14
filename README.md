@@ -79,9 +79,9 @@ The default xAI model is `grok-4.20-0309-non-reasoning`, selected for conversati
 
 Choose **Polish**, **Russian**, or **Chinese** before speaking that language. This passes the corresponding locale to Android speech recognition (`pl-PL`, `ru-RU`, or `zh-CN`) and prevents Google Speech from forcing foreign speech into English homonyms. **Auto** uses the phone's default recognition locale and asks the LLM to detect language after transcription, so it cannot recover foreign words that the speech recognizer has already mistranscribed.
 
-The language menu includes Spanish, French, German, Polish, Russian, Chinese, and the complete published Pixel transcription fallback set. At runtime it asks the phone's installed recognition service for `EXTRA_SUPPORTED_LANGUAGES` and replaces the fallback with every locale that service reports, so the choices follow Pixel/Google updates without an app release.
+The language menu offers only American English (`en-US`) for English, plus Spanish, French, German, Polish, Russian, Chinese, and the complete published Pixel transcription fallback set. Other English regional variants reported by the recognizer are filtered out. At runtime the app asks the phone's installed recognition service for `EXTRA_SUPPORTED_LANGUAGES`, so non-English choices follow Pixel/Google updates without an app release.
 
-The lens reserves three fixed-height regions: English context at the top, then branch one and branch two. Translation mode shows only the English translation in the top region—there is no “they said” label or placeholder. Each foreign-language branch always shows its English meaning on one line and stupidly simple phonetic pronunciation directly beneath it. The contract rejects missing fields, embedded newlines, and branch fields over 36 characters. The G2 SDK exposes one fixed firmware font and no font-size control, so fit is enforced through strict content length rather than a nonexistent smaller-font setting. Partial microphone results continue accumulating off-screen and trigger provider snapshots, but the lens commits only complete response objects, so suggestions change as stable chunks rather than token-by-token.
+The lens reserves three fixed-height regions: English context at the top, then branch one and branch two. Translation mode shows only the English translation in the top region—there is no “they said” label or placeholder. Each foreign-language branch always shows its English meaning on one line and stupidly simple phonetic pronunciation directly beneath it. Stressed syllables are ALL CAPS (`TEEN DOE Bray`, `BWAY-nohs DEE-ahs`, `bohn-ZHOOR`, `GOO-ten tahk`). The contract rejects missing fields and embedded newlines. The G2 SDK exposes one fixed firmware font and no font-size control, so prompts target 36 characters per field; complete over-target responses are retained and flagged rather than disappearing. Partial microphone results continue accumulating off-screen and trigger provider snapshots, but the lens commits only complete response objects, so suggestions change as stable chunks rather than token-by-token.
 
 A live provider log appears below the simulator. It shows outbound transcript snapshots and control settings, incoming xAI SSE chunks, completed parsed responses, and network or parsing errors. API keys and authorization headers are never written to the log.
 
@@ -98,8 +98,12 @@ Live smoke tests read keys directly from the supplied files and never copy them 
 ```bash
 npm run test:live:openai
 npm run test:live:xai
+npm run test:soak:openai
+npm run test:soak:xai
 gradle :app:testDebugUnitTest
 ```
+
+The soak commands grow a conversation over ten consecutive provider calls and fail if any turn stops returning branches. Production keeps the previous valid branches visible while the next generation runs. A provider missing either bilingual field is rejected; a complete sentence that exceeds the conservative 36-character G2 target is preserved and logged as a warning instead of blanking the entire card.
 
 On Ubuntu, the complete host prerequisites can be installed with:
 
