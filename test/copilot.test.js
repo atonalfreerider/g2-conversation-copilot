@@ -16,17 +16,12 @@ test("foreign off-script English becomes a phonetic branch", () => {
   assert.match(c.displayLines().join("\n"), /mock phonetic translation/);
 });
 
-test("ring scroll selects and press mutates or activates", () => {
+test("ring scroll selects and press activates pronunciation", () => {
   const c = new ConversationCopilot(); c.start();
   c.ingest({ speaker: "other", language: "English", text: "I changed careers last year" }, mockSuggestionEngine);
-  c.ring("press");
-  assert.equal(c.state.mode, "strategic");
-  c.ring("swipe_down"); c.ring("press");
-  assert.equal(c.state.tone.stance, "declarative");
-  c.ring("swipe_down"); c.state.tone.risk=7; c.ring("press");
-  assert.equal(c.state.tone.risk, 1);
-  assert.match(c.displayLines()[1], /^EN S D \[1\] •/);
-  c.ring("swipe_down"); c.ring("press"); assert.equal(c.state.spokenBranch,0);
+  c.ring("swipe_down"); c.ring("swipe_down"); c.ring("press");
+  assert.equal(c.state.spokenBranch,2); assert.equal(c.state.viewport,1);
+  assert.doesNotMatch(c.displayLines().join("\n"), /\b(?:EN|RU|PL)\b|\b[PID]\s*[1-7]\b/);
   c.ring("double_press"); assert.equal(c.state.listening, false);
 });
 
@@ -36,5 +31,13 @@ test("foreign branches display English above phonetics", () => {
   assert.equal(c.state.detectedLanguage, "RU");
   const display = c.displayLines().join("\n");
   assert.match(display, /^Hello/m); assert.match(display, /Tell me more\.\n  mock: tell me more/);
-  assert.doesNotMatch(display, /THEY SAID/); assert.match(c.displayLines()[1], /^RU \[P\] I 4 •/);
+  assert.doesNotMatch(display, /THEY SAID|^RU |\[P\]| I 4/m); assert.match(c.displayLines()[1], /^> /);
+});
+
+test("refresh preserves selected branch and immediate neighbors", () => {
+  const c=new ConversationCopilot(); c.start(); let version=0;
+  const engine=req=>({detectedLanguage:"EN",englishContext:req.latestText,replies:Array.from({length:8},(_,i)=>({english:`v${version}-${i}`}))});
+  c.ingest({speaker:"other",language:"English",text:"first"},engine);c.ring("swipe_down");c.ring("swipe_down");c.ring("swipe_down");version=1;
+  c.ingest({speaker:"other",language:"English",text:"second"},engine);
+  assert.deepEqual(c.state.card.replies.map(x=>x.english),["v1-0","v1-1","v0-2","v0-3","v0-4","v1-5","v1-6","v1-7"]);
 });

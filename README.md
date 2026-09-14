@@ -71,14 +71,14 @@ The **Speaker biography** field stores the user's self-description locally on th
 
 ### Pixel glasses simulator
 
-Tap **Open glasses simulator** in the Android app to test without G2 hardware. It includes a lens-sized preview, live Pixel microphone transcription with partial updates, typed input fallback, a speech-language selector, and on-screen R1 controls. Scroll moves the focus through persona, stance, risk, and the six active branch choices. Press toggles P/S or I/D, increments risk (7 wraps to 1), or speaks the selected branch with Android text-to-speech. The lens shows two queue entries at a time; scrolling moves the stable six-entry viewport. English branches use at most two lines. Foreign branches always place up to two English lines above up to two phonetic lines.
+Tap **Open glasses simulator** in the Android app to test without G2 hardware. Language and playful/strategic style are controlled exclusively on the phone and are never printed on the glasses. The R1 scroll moves through eight active responses; press speaks the selected response with Android text-to-speech. The lens shows two queue entries at a time. The selected response and its immediate neighbors are locked during contextual refreshes, while the five unprotected slots can be replaced with fresher suggestions. English branches use at most two lines. Foreign branches always place up to two English lines above up to two phonetic lines.
 
 The simulator also keeps a persistent on-phone transcript and speaker list. The biography supplies the primary speaker name when it contains a phrase such as “My name is John.” After the primary speaker asks “What’s your name?”, the next short respondent answer is saved as that speaker’s name. **Conversation breakpoint** inserts a durable transcript marker and clears the transient lens/queue state. **Translate & pin** sends typed English to the selected foreign language and pins the bilingual result to queue position one. English committed with **I said it** in foreign mode follows the same immediate pinned path. Foreign sessions initially request six common greeting and inquisitive phrases.
 
-Provider prompts carry the speaker biography, compressed recent named turns, `language`, `persona=P|S`, `stance=I|D`, and `risk=1..7`. They require exactly six structured branch objects. For example:
+Provider prompts carry the speaker biography, compressed recent named turns, phone-selected `language`, and `persona=P|S`. They require exactly eight structured branches in this order: inquisitive risk 1, declarative risk 1, inquisitive risk 2, declarative risk 2, inquisitive risk 3, declarative risk 3, inquisitive risk 4, declarative risk 4. Risk 4 is the deliberately extreme option. These classifications are not shown on the glasses.
 
 ```text
-CONTROL VARIABLES: language=PL; persona=P; stance=I; risk=7/7.
+CONTROL VARIABLES: language=PL; persona=P.
 SPEAKER BIOGRAPHY: My name is John. I am a photographer from Chicago.
 Conversation transcript: Speakers: John · Katy. Recent turns: Katy: I love Warsaw...
 ```
