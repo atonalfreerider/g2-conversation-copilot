@@ -3,6 +3,8 @@ package com.g2copilot.settings;
 import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.os.Bundle;
@@ -19,6 +21,8 @@ import android.widget.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -34,6 +38,7 @@ public final class SimulatorActivity extends Activity {
     private final Handler handler=new Handler(Looper.getMainLooper());
     private final ExecutorService network=Executors.newSingleThreadExecutor(); private SecureSettings settings; private boolean requestInFlight=false, queuedRefresh=false; private volatile long desiredGeneration=0; private volatile java.net.HttpURLConnection activeConnection;
     private final List<String> conversation=new ArrayList<>();
+    private final List<String> speechTags=new ArrayList<>();
     private String pendingSpeech="", lastSuggestedSpeech="";
     private final Runnable settledSpeech=()->refreshLiveSuggestions();
     private long requestStartedAt=0; private volatile long timedOutGeneration=-1; private Runnable providerDeadline;
@@ -50,7 +55,7 @@ public final class SimulatorActivity extends Activity {
         axisHint=text("",15,Color.rgb(35,78,43));root.addView(axisHint);
         backendStatus=text("Provider idle",14,Color.rgb(35,78,43));root.addView(backendStatus);
         backend=new Spinner(this);backend.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,Provider.values()));backend.setSelection(settings.activeProvider().ordinal());root.addView(backend);
-        speechLanguage=new Spinner(this);speechLanguage.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Auto (phone default)","English","Polish — polski","Russian — русский","Chinese — 中文"}));root.addView(speechLanguage);
+        speechLanguage=new Spinner(this);setSpeechLanguages(fallbackLanguageTags());root.addView(speechLanguage);loadRecognizerLanguages();
         utterance=new EditText(this);utterance.setHint("What the microphone heard");utterance.setMinLines(2);utterance.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE);utterance.setText("I changed careers because I wanted something meaningful");root.addView(utterance);
         LinearLayout turns=row();Button other=button("Hear them");Button me=button("I said it");turns.addView(other,weight());turns.addView(me,weight());root.addView(turns);
         LinearLayout ring=row();Button up=button("Scroll ↑");Button press=button("R1 press");Button down=button("Scroll ↓");ring.addView(up,weight());ring.addView(press,weight());ring.addView(down,weight());root.addView(ring);
@@ -115,8 +120,11 @@ public final class SimulatorActivity extends Activity {
     private void setBackendStatus(String value){runOnUiThread(()->backendStatus.setText(value));}
     private void runQueuedRefresh(){if(queuedRefresh||(!pendingSpeech.isEmpty()&&!pendingSpeech.equals(lastSuggestedSpeech))){queuedRefresh=false;String latest=rollingText(pendingSpeech);if(!latest.isEmpty())requestSuggestions(latest);}}
     private String rollingText(String partial){StringBuilder out=new StringBuilder();for(String turn:conversation){if(out.length()>0)out.append(' ');out.append(turn);}if(!partial.isEmpty()){if(out.length()>0)out.append(' ');out.append(partial);}return out.toString();}
-    private String languageCode(){if(speechLanguage==null)return"AUTO";switch(speechLanguage.getSelectedItemPosition()){case 1:return"EN";case 2:return"PL";case 3:return"RU";case 4:return"ZH";default:return"AUTO";}}
-    private String languageTag(){switch(languageCode()){case"EN":return"en-US";case"PL":return"pl-PL";case"RU":return"ru-RU";case"ZH":return"zh-CN";default:return null;}}
+    private String languageCode(){String tag=languageTag();return tag==null?"AUTO":Locale.forLanguageTag(tag).getLanguage().toUpperCase(Locale.ROOT);}
+    private String languageTag(){int position=speechLanguage==null?0:speechLanguage.getSelectedItemPosition();return position<=0||position>speechTags.size()?null:speechTags.get(position-1);}
+    private List<String> fallbackLanguageTags(){return Arrays.asList("en-US","en-GB","en-AU","en-IN","en-SG","es-ES","es-US","fr-FR","fr-CA","de-DE","pl-PL","ru-RU","zh-CN","zh-TW","bn-BD","bg-BG","cs-CZ","da-DK","nl-NL","fi-FI","hi-IN","hu-HU","id-ID","xh-ZA","it-IT","ja-JP","kn-IN","km-KH","rw-RW","ko-KR","ml-IN","mr-IN","pt-BR","tn-ZA","st-ZA","ss-ZA","sv-SE","ta-IN","te-IN","tr-TR","ts-ZA");}
+    private void setSpeechLanguages(List<String> tags){String selected=languageTag();speechTags.clear();speechTags.addAll(new LinkedHashSet<>(tags));List<String> labels=new ArrayList<>();labels.add("Auto (phone default)");for(String tag:speechTags){Locale locale=Locale.forLanguageTag(tag);labels.add(locale.getDisplayName()+" — "+tag);}speechLanguage.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,labels));if(selected!=null){int index=speechTags.indexOf(selected);if(index>=0)speechLanguage.setSelection(index+1);}}
+    private void loadRecognizerLanguages(){Intent details=new Intent(RecognizerIntent.ACTION_GET_LANGUAGE_DETAILS);sendOrderedBroadcast(details,null,new BroadcastReceiver(){@Override public void onReceive(Context context,Intent intent){Bundle extras=getResultExtras(true);ArrayList<String> supported=extras==null?null:extras.getStringArrayList(RecognizerIntent.EXTRA_SUPPORTED_LANGUAGES);if(supported!=null&&!supported.isEmpty())setSpeechLanguages(supported);}},null,Activity.RESULT_OK,null,null);}
     private void scrollTone(int direction){
         if(axis==0)playful=!playful;else if(axis==1)inquisitive=!inquisitive;else risk=Math.max(1,Math.min(7,risk+direction));String heard=rollingText(pendingSpeech);if(!heard.isEmpty())updateSuggestions(heard,false);else render();
     }
