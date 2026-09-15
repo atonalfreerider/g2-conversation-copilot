@@ -1,7 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <application android:theme="@style/AppTheme" android:label="G2 Copilot" android:allowBackup="true" android:fullBackupContent="@xml/backup_rules" android:dataExtractionRules="@xml/data_extraction_rules" android:usesCleartextTraffic="false">
+        <service android:name=".CompanionBridgeService" android:exported="false" android:foregroundServiceType="dataSync" />
         <activity android:name=".SimulatorActivity" android:screenOrientation="portrait" android:exported="false" />
         <activity android:name=".MainActivity" android:screenOrientation="portrait" android:exported="true">
             <intent-filter>

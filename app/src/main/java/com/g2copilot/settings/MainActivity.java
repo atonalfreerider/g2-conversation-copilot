@@ -2,6 +2,7 @@ package com.g2copilot.settings;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.Context;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.text.InputType;
@@ -18,7 +19,7 @@ public final class MainActivity extends Activity {
     private final ExecutorService network = Executors.newSingleThreadExecutor();
 
     @Override public void onCreate(Bundle state) {
-        super.onCreate(state); settings=new SecureSettings(this); setContentView(buildUi());Provider active=settings.activeProvider();provider.setSelection(active.ordinal());load(active);
+        super.onCreate(state); settings=new SecureSettings(this);startForegroundService(new Intent(this,CompanionBridgeService.class));setContentView(buildUi());Provider active=settings.activeProvider();provider.setSelection(active.ordinal());load(active);
     }
     private View buildUi() {
         ScrollView scroll=new ScrollView(this); LinearLayout root=new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setPadding(dp(24),dp(28),dp(24),dp(36)); root.setBackgroundColor(Color.rgb(243,246,242)); scroll.addView(root);
@@ -33,6 +34,7 @@ public final class MainActivity extends Activity {
         root.addView(label("Conversation style")); persona=choice("Playful","Strategic / trust-building"); root.addView(persona);
         nativeCharacters=new Switch(this);nativeCharacters.setText("Show native characters instead of phonetic English");nativeCharacters.setChecked(getSharedPreferences("profile",MODE_PRIVATE).getBoolean("native_characters",false));root.addView(nativeCharacters);
         Button saveDefaults=button("Save defaults"); root.addView(saveDefaults); status=text("Keys stay encrypted on this phone.",14); status.setPadding(0,dp(18),0,0); root.addView(status);
+        Button bridge=button("Start EvenHub provider bridge");root.addView(bridge);bridge.setOnClickListener(v->{Context c=this;Intent i=new Intent(c,CompanionBridgeService.class);c.startForegroundService(i);show("EvenHub bridge active on this phone");});
         Button simulator=button("Open glasses simulator"); root.addView(simulator);
         provider.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){ public void onItemSelected(AdapterView<?> p,View v,int pos,long id){Provider chosen=Provider.values()[pos];settings.setActiveProvider(chosen);load(chosen);boolean cloud=chosen!=Provider.GEMINI_NANO;apiKey.setEnabled(cloud);model.setEnabled(cloud);endpoint.setEnabled(cloud);test.setText(cloud?"Test connection":"Check Gemini Nano");} public void onNothingSelected(AdapterView<?> p){} });
         nativeCharacters.setOnCheckedChangeListener((v,checked)->getSharedPreferences("profile",MODE_PRIVATE).edit().putBoolean("native_characters",checked).apply());
