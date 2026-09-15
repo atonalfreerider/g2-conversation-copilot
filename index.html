@@ -1,0 +1,9 @@
+<!doctype html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Conversation Copilot</title></head>
+<body><main><h1>Conversation Copilot</h1><p id="status">Connecting to Even G2…</p>
+<label>Conversation language<select id="language"><option value="en-US">American English</option><option value="de-DE">German</option><option value="es-ES">Spanish</option><option value="fr-FR">French</option><option value="pl-PL">Polish</option><option value="ru-RU">Russian</option><option value="zh-CN">Chinese (Simplified)</option></select></label>
+<label>Style<select id="style"><option value="P">Playful</option><option value="S">Strategic / trust-building</option></select></label>
+<label class="toggle"><input id="native" type="checkbox"> Show native characters instead of phonetic English</label>
+<button id="mic">Start G2 microphone</button><button id="refresh">Refresh all eight branches</button>
+<p class="help">R1 scroll selects a response. R1 press regenerates all eight. Double press closes the app.</p>
+<pre id="log"></pre></main><script type="module" src="/evenhub/main.ts"></script></body></html>

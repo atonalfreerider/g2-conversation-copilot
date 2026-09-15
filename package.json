@@ -3,11 +3,24 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev:glasses": "vite --host 0.0.0.0 --port 5173",
+    "build:glasses": "vite build",
+    "pack:glasses": "npm run build:glasses && evenhub pack app.json dist -o g2-conversation-copilot.ehpk --sdk-ver 0.0.15",
     "demo": "node server.mjs",
     "test": "node --test",
     "test:live:openai": "node scripts/live-provider-smoke.mjs openai /home/john/Documents/oai-key",
     "test:live:xai": "node scripts/live-provider-smoke.mjs xai /home/john/Documents/xAI-Key",
     "test:soak:openai": "node scripts/provider-soak.mjs openai 10",
     "test:soak:xai": "node scripts/provider-soak.mjs xai 10"
+  },
+  "dependencies": {
+    "@evenrealities/even_hub_sdk": "^0.0.15"
+  },
+  "devDependencies": {
+    "@evenrealities/evenhub-simulator": "^0.9.3",
+    "@types/node": "^22.20.3",
+    "qrcode": "^1.5.4",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.5"
   }
 }

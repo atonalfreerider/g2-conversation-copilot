@@ -1,0 +1,21 @@
+{
+  "package_id": "com.g2copilot.conversation",
+  "edition": "202601",
+  "name": "Conversation Copilot",
+  "version": "0.1.0",
+  "min_app_version": "2.2.10",
+  "min_sdk_version": "0.0.15",
+  "entrypoint": "index.html",
+  "permissions": [
+    {
+      "name": "network",
+      "desc": "This app needs to access the network in order to ...",
+      "whitelist": [
+        "http://*"
+      ]
+    }
+  ],
+  "supported_languages": [
+    "en", "de", "es", "fr", "it", "zh", "ja", "ko"
+  ]
+}
