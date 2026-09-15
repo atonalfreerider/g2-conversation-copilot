@@ -8,13 +8,14 @@ export class ConversationCopilot {
   constructor({ contextWordCount = 20, mode = Mode.PLAYFUL } = {}) {
     this.state = {
       detectedLanguage: "EN", contextWordCount, mode, listening: false,
-      selection: 0, transcript: [], viewport: 0,
+      selection: 0, transcript: [], viewport: 0, showNative: false,
       card: { detectedLanguage: "EN", englishContext: "Ready", replies: [] },
     };
   }
   start() { this.state.listening = true; return this.snapshot(); }
   stop() { this.state.listening = false; return this.snapshot(); }
   toggleMode() { this.state.mode = this.state.mode === Mode.PLAYFUL ? Mode.STRATEGIC : Mode.PLAYFUL; return this.snapshot(); }
+  setNativeCharacters(enabled) { this.state.showNative = Boolean(enabled); return this.snapshot(); }
 
   ingest({ speaker, language, text }, suggestionEngine) {
     if (!this.state.listening) return this.snapshot();
@@ -49,7 +50,7 @@ export class ConversationCopilot {
       if (this.state.selection < this.state.viewport) this.state.viewport = this.state.selection;
       if (this.state.selection > this.state.viewport + 1) this.state.viewport = this.state.selection - 1;
     }
-    if (action === "press") this.state.spokenBranch = this.state.selection;
+    if (action === "press") this.state.refreshRequested = true;
     if (action === "double_press") this.stop();
     return this.snapshot();
   }
@@ -62,7 +63,7 @@ export class ConversationCopilot {
       const index = s.viewport + localIndex;
       const branch = `${s.selection === index ? ">" : "•"} ${r.english}`;
       lines.push(branch);
-      if (foreign && r.phonetic) lines.push(`  ${r.phonetic}`);
+      if (foreign) lines.push(`  ${s.showNative ? r.native : r.phonetic}`);
     });
     const visible = lines;
     return visible;
@@ -79,19 +80,19 @@ export function mockSuggestionEngine(req) {
   }
   if (req.userWentOffScript) return {
     detectedLanguage, englishContext: lastWords(req.latestText, req.contextWordCount),
-    pinned:true,replies: Array.from({length:8},(_,i)=>({ english: i ? `Option ${i+1}` : req.latestText, phonetic: i ? `mock option ${i+1}` : "mock phonetic translation" })),
+    pinned:true,replies: Array.from({length:8},(_,i)=>({ english: i ? `Option ${i+1}` : req.latestText, native:`native ${i+1}`, phonetic: i ? `mock option ${i+1}` : "mock phonetic translation" })),
   };
   return {
     detectedLanguage, englishContext: mockEnglishTranslation(req.latestText, detectedLanguage),
     replies: [
-      { english: "Tell me more.", phonetic: "mock: tell me more" },
-      { english: "That sounds wonderful.", phonetic: "mock: sounds wonderful" },
-      { english: "What is your name?", phonetic: "mock: what is your name" },
-      { english: "Where are you from?", phonetic: "mock: where are you from" },
-      { english: "Please say that again.", phonetic: "mock: say it again" },
-      { english: "It is nice to meet you.", phonetic: "mock: nice to meet you" },
-      { english: "What brought you here?", phonetic: "mock: what brought you here" },
-      { english: "You have an unforgettable smile.", phonetic: "mock: unforgettable smile" },
+      { english: "Tell me more.", native:"native one", phonetic: "mock: tell me more" },
+      { english: "That sounds wonderful.", native:"native two", phonetic: "mock: sounds wonderful" },
+      { english: "What is your name?", native:"native three", phonetic: "mock: what is your name" },
+      { english: "Where are you from?", native:"native four", phonetic: "mock: where are you from" },
+      { english: "Please say that again.", native:"native five", phonetic: "mock: say it again" },
+      { english: "It is nice to meet you.", native:"native six", phonetic: "mock: nice to meet you" },
+      { english: "What brought you here?", native:"native seven", phonetic: "mock: what brought you here" },
+      { english: "You have an unforgettable smile.", native:"native eight", phonetic: "mock: unforgettable smile" },
     ],
   };
 }

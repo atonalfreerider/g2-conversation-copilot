@@ -16,13 +16,18 @@ test("foreign off-script English becomes a phonetic branch", () => {
   assert.match(c.displayLines().join("\n"), /mock phonetic translation/);
 });
 
-test("ring scroll selects and press activates pronunciation", () => {
+test("ring scroll selects and press requests all-branch refresh", () => {
   const c = new ConversationCopilot(); c.start();
   c.ingest({ speaker: "other", language: "English", text: "I changed careers last year" }, mockSuggestionEngine);
   c.ring("swipe_down"); c.ring("swipe_down"); c.ring("press");
-  assert.equal(c.state.spokenBranch,2); assert.equal(c.state.viewport,1);
+  assert.equal(c.state.refreshRequested,true); assert.equal(c.state.viewport,1);
   assert.doesNotMatch(c.displayLines().join("\n"), /\b(?:EN|RU|PL)\b|\b[PID]\s*[1-7]\b/);
   c.ring("double_press"); assert.equal(c.state.listening, false);
+});
+
+test("foreign output defaults phonetic and can toggle native characters",()=>{
+  const c=new ConversationCopilot();c.start();c.ingest({speaker:"other",language:"unknown",text:"Привет"},mockSuggestionEngine);
+  assert.match(c.displayLines().join("\n"),/mock: tell me more/);c.setNativeCharacters(true);assert.match(c.displayLines().join("\n"),/native one/);
 });
 
 test("foreign branches display English above phonetics", () => {
