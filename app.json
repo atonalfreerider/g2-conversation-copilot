@@ -2,7 +2,7 @@
   "package_id": "com.g2copilot.conversation",
   "edition": "202601",
   "name": "Conversation Copilot",
-  "version": "0.1.3",
+  "version": "0.3.0",
   "min_app_version": "2.2.10",
   "min_sdk_version": "0.0.15",
   "entrypoint": "index.html",
@@ -12,6 +12,8 @@
       "desc": "This app needs to access the network in order to ...",
       "whitelist": [
         "http://*",
+        "http://127.0.0.1:8787",
+        "http://localhost:8787",
         "https://api.openai.com",
         "wss://api.openai.com"
       ]

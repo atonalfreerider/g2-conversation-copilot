@@ -5,12 +5,13 @@ import java.io.*;import java.net.*;import java.nio.charset.StandardCharsets;impo
 
 public final class CompanionBridgeService extends Service {
     static final String ACTION_PROVIDER_CHANGED="com.g2copilot.PROVIDER_CHANGED",ACTION_NANO_FOREGROUND="com.g2copilot.NANO_FOREGROUND";
-    private static final int PORT=8787,NOTIFICATION_ID=8787;private ServerSocket server;private final ExecutorService pool=Executors.newCachedThreadPool();private volatile boolean running;
-    @Override public void onCreate(){super.onCreate();NotificationManager nm=getSystemService(NotificationManager.class);nm.createNotificationChannel(new NotificationChannel("g2_bridge","G2 Copilot bridge",NotificationManager.IMPORTANCE_LOW));nm.createNotificationChannel(new NotificationChannel("g2_nano","Gemini Nano attention",NotificationManager.IMPORTANCE_HIGH));startForeground(NOTIFICATION_ID,bridgeNotification());startServer();}
+    private static final int PORT=8787,NOTIFICATION_ID=8787;private ServerSocket server;private final ExecutorService pool=Executors.newCachedThreadPool();private volatile boolean running;private LocalSpeechEngine speech;
+    @Override public void onCreate(){super.onCreate();speech=new LocalSpeechEngine(this);NotificationManager nm=getSystemService(NotificationManager.class);nm.createNotificationChannel(new NotificationChannel("g2_bridge","G2 Copilot bridge",NotificationManager.IMPORTANCE_LOW));nm.createNotificationChannel(new NotificationChannel("g2_nano","Gemini Nano attention",NotificationManager.IMPORTANCE_HIGH));startForeground(NOTIFICATION_ID,bridgeNotification());startServer();}
     @Override public int onStartCommand(Intent i,int f,int id){if(new SecureSettings(this).activeProvider()==Provider.GEMINI_NANO){getSystemService(NotificationManager.class).notify(NOTIFICATION_ID,bridgeNotification());if(!ForegroundState.mainActivityVisible)postNanoAttention();}return START_STICKY;}@Override public IBinder onBind(Intent i){return null;}
     private PendingIntent openCompanion(){Intent open=new Intent(this,MainActivity.class).setAction(ACTION_NANO_FOREGROUND).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_SINGLE_TOP|Intent.FLAG_ACTIVITY_CLEAR_TOP);return PendingIntent.getActivity(this,91,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);}
     private Notification bridgeNotification(){boolean nano=new SecureSettings(this).activeProvider()==Provider.GEMINI_NANO;return new Notification.Builder(this,"g2_bridge").setSmallIcon(android.R.drawable.ic_btn_speak_now).setContentTitle("G2 Conversation Copilot").setContentText(nano?(ForegroundState.mainActivityVisible?"Gemini Nano active in foreground":"Gemini Nano paused — tap to resume"):"EvenHub provider bridge active").setContentIntent(openCompanion()).setOngoing(true).build();}
     private void postNanoAttention(){Notification n=new Notification.Builder(this,"g2_nano").setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle("Tap to activate Gemini Nano").setContentText("Offline generation requires G2 Copilot in the foreground").setContentIntent(openCompanion()).setAutoCancel(true).setPriority(Notification.PRIORITY_HIGH).build();getSystemService(NotificationManager.class).notify(8788,n);}
+    private void postSpeechAttention(){Notification n=new Notification.Builder(this,"g2_nano").setSmallIcon(android.R.drawable.ic_btn_speak_now).setContentTitle("Tap to activate on-device speech").setContentText("Pixel transcription requires G2 Copilot in the foreground").setContentIntent(openCompanion()).setAutoCancel(true).setPriority(Notification.PRIORITY_HIGH).build();getSystemService(NotificationManager.class).notify(8789,n);}
     private void startServer(){running=true;pool.execute(()->{try{server=new ServerSocket(PORT,16,InetAddress.getByName("127.0.0.1"));while(running){Socket socket=server.accept();pool.execute(()->handle(socket));}}catch(Exception ignored){}});}
     private void handle(Socket socket) {
         if (socket == null) return;
@@ -64,6 +65,30 @@ public final class CompanionBridgeService extends Service {
             }
             if (first.contains(" /realtime-token ")) {
                 respond(socket, 200, realtimeToken(req.optString("language", "en-US")).toString());
+                return;
+            }
+            if (first.contains(" /speech/start ")) {
+                if(!ForegroundState.mainActivityVisible){postSpeechAttention();respond(socket,409,new JSONObject().put("error","On-device speech paused — tap the G2 Copilot notification and keep the companion foreground").put("requiresForeground",true).toString());return;}
+                respond(socket, 200, speech.start(req.optString("language", "en-US")).toString());
+                return;
+            }
+            if (first.contains(" /speech/chunk ")) {
+                speech.write(Base64.decode(req.getString("audio"), Base64.DEFAULT));
+                respond(socket, 200, speech.snapshot().toString());
+                return;
+            }
+            if (first.contains(" /speech/poll ")) {
+                respond(socket, 200, speech.snapshot().toString());
+                return;
+            }
+            if (first.contains(" /speech/finish ")) {
+                speech.finishInput();
+                respond(socket, 200, speech.snapshot().toString());
+                return;
+            }
+            if (first.contains(" /speech/stop ")) {
+                speech.stop();
+                respond(socket, 200, speech.snapshot().toString());
                 return;
             }
             if (first.contains(" /transcribe ")) {
@@ -154,6 +179,6 @@ public final class CompanionBridgeService extends Service {
     private String transcribe(byte[] wav,String tag)throws Exception{SecureSettings s=new SecureSettings(this);String sourceLanguage=Locale.forLanguageTag(tag).getLanguage();boolean translate=!"en".equals(sourceLanguage);String endpoint=translate?"translations":"transcriptions";String boundary="----g2"+System.currentTimeMillis();HttpURLConnection c=(HttpURLConnection)new URL("https://api.openai.com/v1/audio/"+endpoint).openConnection();c.setRequestMethod("POST");c.setConnectTimeout(12_000);c.setReadTimeout(30_000);c.setDoOutput(true);c.setRequestProperty("Authorization","Bearer "+s.key(Provider.OPENAI));c.setRequestProperty("Content-Type","multipart/form-data; boundary="+boundary);ByteArrayOutputStream body=new ByteArrayOutputStream();part(body,boundary,"model",null,(translate?"whisper-1":"gpt-4o-mini-transcribe").getBytes(StandardCharsets.UTF_8));if(!translate)part(body,boundary,"language",null,sourceLanguage.getBytes(StandardCharsets.UTF_8));part(body,boundary,"file","turn.wav",wav);body.write(("--"+boundary+"--\r\n").getBytes(StandardCharsets.UTF_8));try(OutputStream out=c.getOutputStream()){body.writeTo(out);}int code=c.getResponseCode();InputStream stream=code<400?c.getInputStream():c.getErrorStream();String raw=read(stream);if(code>=400)throw new IllegalStateException("Transcription HTTP "+code);String text=new JSONObject(raw).optString("text").trim();return text.equals("...")?"":text;}
     private void part(OutputStream out,String boundary,String name,String filename,byte[] value)throws Exception{out.write(("--"+boundary+"\r\nContent-Disposition: form-data; name=\""+name+"\""+(filename==null?"":"; filename=\""+filename+"\"")+"\r\n"+(filename==null?"":"Content-Type: audio/wav\r\n")+"\r\n").getBytes(StandardCharsets.UTF_8));out.write(value);out.write("\r\n".getBytes(StandardCharsets.UTF_8));}
     private String read(InputStream in)throws Exception{ByteArrayOutputStream b=new ByteArrayOutputStream();byte[] x=new byte[4096];for(int n;(n=in.read(x))>0;)b.write(x,0,n);return b.toString("UTF-8");}
-    private void respond(Socket socket,int code,String body)throws Exception{if(socket==null)return;byte[] bytes=body.getBytes(StandardCharsets.UTF_8);String status=code==200?"OK":code==204?"No Content":code==404?"Not Found":code==409?"Conflict":"Error";OutputStream out=socket.getOutputStream();out.write(("HTTP/1.1 "+code+" "+status+"\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Headers: content-type\r\nAccess-Control-Allow-Methods: GET,POST,OPTIONS\r\nContent-Length: "+bytes.length+"\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.UTF_8));out.write(bytes);out.flush();}
-    @Override public void onDestroy(){running=false;try{server.close();}catch(Exception ignored){}pool.shutdownNow();super.onDestroy();}
+    private void respond(Socket socket,int code,String body)throws Exception{if(socket==null)return;byte[] bytes=body.getBytes(StandardCharsets.UTF_8);String status=code==200?"OK":code==204?"No Content":code==404?"Not Found":code==409?"Conflict":"Error";OutputStream out=socket.getOutputStream();out.write(("HTTP/1.1 "+code+" "+status+"\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Private-Network: true\r\nAccess-Control-Allow-Headers: content-type\r\nAccess-Control-Allow-Methods: GET,POST,OPTIONS\r\nContent-Length: "+bytes.length+"\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.UTF_8));out.write(bytes);out.flush();}
+    @Override public void onDestroy(){running=false;if(speech!=null)speech.close();try{server.close();}catch(Exception ignored){}pool.shutdownNow();super.onDestroy();}
 }

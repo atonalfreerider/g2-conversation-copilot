@@ -55,6 +55,8 @@ Then open `http://localhost:4173`.
 
 The native app under `app/` configures OpenAI, xAI/Grok, cloud Gemini, and Gemini Nano independently. API keys are encrypted using a non-exportable Android Keystore AES-GCM key. Cloud connections have an editable model and endpoint plus a connection test. **Gemini Nano · on-device** uses the Pixel's shared AICore model through ML Kit Prompt API and requires no developer API key. The build uses Android Gradle Plugin 8.9.1 so it can use the installed Build Tools 35.0.0 without requesting Build Tools 36.
 
+Microphone audio is no longer sent to OpenAI. G2's raw mono 16-bit/16-kHz PCM is streamed over the phone loopback bridge into Pixel ML Kit Speech Recognition in latency-first Basic mode. Partial text is returned continuously. For non-English sessions, those partials are translated to English by ML Kit's downloaded on-device Translation model before the top lens container is updated. OpenAI, xAI, cloud Gemini, or Gemini Nano receive text only for branch generation.
+
 Build and deploy from a machine with Android SDK Platform 35, Build Tools 35, JDK 17+, and Gradle 8.11.1 available:
 
 ```bash
@@ -87,7 +89,7 @@ Conversation transcript: Speakers: John · Katy. Recent turns: Katy: I love Wars
 
 The backend can be switched from either the main phone settings screen or the EvenHub surface. Selecting a backend makes it active immediately. The Gemini choices are deliberately separate: **Gemini Nano · on-device** is private, offline-capable, and keyless; **Google Gemini** is the cloud API and still requires a key.
 
-Gemini Nano/AICore permits generation only while this companion app is the top foreground app. Select Nano or tap **Enable Nano foreground mode** on the phone; the app keeps the screen awake. If the glasses ask for a Nano branch while the companion is backgrounded, the bridge returns a foreground-required state and posts a tappable **Activate Gemini Nano** notification. Android does not allow an ordinary background app to force itself onscreen, so this tap is the supported handoff instead of an unreliable automatic launch.
+Pixel's ML Kit GenAI speech recognizer and Gemini Nano/AICore permit inference only while this companion app is the top foreground app. Launch the G2 plugin first, then tap the phone notification or **Enable on-device speech foreground**; the companion keeps the screen awake while the G2 page continues behind it. Background requests return a foreground-required state and retry automatically. Android does not allow an ordinary background app to force itself onscreen, so the notification tap is the supported handoff.
 
 ### Prototype hot reload without repeated QR scans
 
