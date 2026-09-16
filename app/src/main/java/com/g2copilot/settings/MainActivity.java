@@ -1,30 +1,34 @@
 package com.g2copilot.settings;
 
 import android.app.Activity;
+import android.Manifest;
 import android.content.Intent;
 import android.content.Context;
 import android.graphics.Color;
+import android.os.Build;
 import android.os.Bundle;
 import android.text.InputType;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public final class MainActivity extends Activity {
     private SecureSettings settings; private Spinner provider, persona; private EditText apiKey, model, endpoint, words, biography;
-    private TextView status; private Button test; private Switch nativeCharacters;
+    private TextView status, nanoStatus; private Button test, nanoMode; private Switch nativeCharacters;
     private final ExecutorService network = Executors.newSingleThreadExecutor();
 
     @Override public void onCreate(Bundle state) {
-        super.onCreate(state); settings=new SecureSettings(this);startForegroundService(new Intent(this,CompanionBridgeService.class));setContentView(buildUi());Provider active=settings.activeProvider();provider.setSelection(active.ordinal());load(active);
+        super.onCreate(state); settings=new SecureSettings(this);startForegroundService(new Intent(this,CompanionBridgeService.class));setContentView(buildUi());Provider active=settings.activeProvider();provider.setSelection(active.ordinal());load(active);if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=getPackageManager().PERMISSION_GRANTED)requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},41);applyProviderMode(active);
     }
     private View buildUi() {
         ScrollView scroll=new ScrollView(this); LinearLayout root=new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setPadding(dp(24),dp(28),dp(24),dp(36)); root.setBackgroundColor(Color.rgb(243,246,242)); scroll.addView(root);
         TextView title=text("G2 Conversation Copilot",28); root.addView(title); root.addView(text("Connections and glasses defaults",16));
         provider=new Spinner(this); provider.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,Provider.values())); root.addView(label("Backend")); root.addView(provider);
+        nanoStatus=text("Nano offline mode is available when needed.",14);root.addView(nanoStatus);nanoMode=button("Enable Nano foreground mode");root.addView(nanoMode);
         apiKey=input("API key"); apiKey.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD); root.addView(apiKey);
         model=input("Model"); endpoint=input("API endpoint"); root.addView(model); root.addView(endpoint);
         LinearLayout actions=new LinearLayout(this); test=button("Test connection"); Button save=button("Save securely"); actions.addView(test); actions.addView(save); root.addView(actions);
@@ -35,13 +39,13 @@ public final class MainActivity extends Activity {
         nativeCharacters=new Switch(this);nativeCharacters.setText("Show native characters instead of phonetic English");nativeCharacters.setChecked(getSharedPreferences("profile",MODE_PRIVATE).getBoolean("native_characters",false));root.addView(nativeCharacters);
         Button saveDefaults=button("Save defaults"); root.addView(saveDefaults); status=text("Keys stay encrypted on this phone.",14); status.setPadding(0,dp(18),0,0); root.addView(status);
         Button bridge=button("Start EvenHub provider bridge");root.addView(bridge);bridge.setOnClickListener(v->{Context c=this;Intent i=new Intent(c,CompanionBridgeService.class);c.startForegroundService(i);show("EvenHub bridge active on this phone");});
-        Button simulator=button("Open glasses simulator"); root.addView(simulator);
-        provider.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){ public void onItemSelected(AdapterView<?> p,View v,int pos,long id){Provider chosen=Provider.values()[pos];settings.setActiveProvider(chosen);load(chosen);boolean cloud=chosen!=Provider.GEMINI_NANO;apiKey.setEnabled(cloud);model.setEnabled(cloud);endpoint.setEnabled(cloud);test.setText(cloud?"Test connection":"Check Gemini Nano");} public void onNothingSelected(AdapterView<?> p){} });
+        provider.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){ public void onItemSelected(AdapterView<?> p,View v,int pos,long id){Provider chosen=Provider.values()[pos];settings.setActiveProvider(chosen);load(chosen);applyProviderMode(chosen);Intent i=new Intent(MainActivity.this,CompanionBridgeService.class).setAction(CompanionBridgeService.ACTION_PROVIDER_CHANGED);startForegroundService(i);} public void onNothingSelected(AdapterView<?> p){} });
         nativeCharacters.setOnCheckedChangeListener((v,checked)->getSharedPreferences("profile",MODE_PRIVATE).edit().putBoolean("native_characters",checked).apply());
         save.setOnClickListener(v->saveConnection()); test.setOnClickListener(v->testConnection()); saveDefaults.setOnClickListener(v->{getPreferences(MODE_PRIVATE).edit().putInt("words",number(words,20)).putString("persona",persona.getSelectedItemPosition()==0?"P":"S").apply();getSharedPreferences("profile",MODE_PRIVATE).edit().putString("biography",biography.getText().toString().trim()).putBoolean("native_characters",nativeCharacters.isChecked()).apply();show("Defaults and biography saved on phone");});
-        simulator.setOnClickListener(v->startActivity(new Intent(this,SimulatorActivity.class)));
+        nanoMode.setOnClickListener(v->{provider.setSelection(Provider.GEMINI_NANO.ordinal());settings.setActiveProvider(Provider.GEMINI_NANO);applyProviderMode(Provider.GEMINI_NANO);show("Nano foreground mode active. Keep this screen visible while using offline branches.");});
         return scroll;
     }
+    private void applyProviderMode(Provider chosen){boolean cloud=chosen!=Provider.GEMINI_NANO;apiKey.setEnabled(cloud);model.setEnabled(cloud);endpoint.setEnabled(cloud);test.setText(cloud?"Test connection":"Check Gemini Nano");if(cloud){getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);nanoStatus.setText("Nano offline mode is available when needed.");nanoMode.setText("Enable Nano foreground mode");}else{getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);nanoStatus.setText(ForegroundState.mainActivityVisible?"Nano active · companion is foreground · screen kept awake":"Nano selected · bring this screen to the foreground");nanoMode.setText("Keep Nano active in foreground");}}
     private void load(Provider p) { try { apiKey.setText(settings.key(p)); model.setText(settings.model(p)); endpoint.setText(settings.url(p)); } catch(Exception e){ show("Could not unlock saved key"); } }
     private void saveConnection() { try { settings.put(selected(),apiKey.getText().toString().trim(),model.getText().toString().trim(),endpoint.getText().toString().trim()); show(selected().label+" saved securely"); } catch(Exception e){ show("Save failed"); } }
     private void testConnection() { saveConnection(); test.setEnabled(false); show("Testing " + selected().label + "…"); network.execute(()->{ try { String result;if(selected()==Provider.GEMINI_NANO){OnDeviceGeminiClient.suggest("CONTROL VARIABLES: language=EN. Return only JSON with language EN, context Gemini Nano ready, and eight branch objects containing english plus empty native and phonetic fields.",null);result="Gemini Nano ready · no API key";}else result=ProviderClient.test(selected(),endpoint.getText().toString().trim(),model.getText().toString().trim(),apiKey.getText().toString().trim());runOnUiThread(()->{show(result);test.setEnabled(true);}); } catch(Exception e){runOnUiThread(()->{show(e.getMessage());test.setEnabled(true);});} }); }
@@ -54,5 +58,7 @@ public final class MainActivity extends Activity {
     private int number(EditText e,int fallback){try{return Integer.parseInt(e.getText().toString());}catch(Exception ignored){return fallback;}}
     private void show(String s){status.setText(s==null?"Connection failed":s);}
     private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
+    @Override protected void onResume(){super.onResume();ForegroundState.mainActivityVisible=true;if(settings!=null&&settings.activeProvider()==Provider.GEMINI_NANO){getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);if(nanoStatus!=null)nanoStatus.setText("Nano active · companion is foreground · screen kept awake");startForegroundService(new Intent(this,CompanionBridgeService.class).setAction(CompanionBridgeService.ACTION_NANO_FOREGROUND));}}
+    @Override protected void onPause(){ForegroundState.mainActivityVisible=false;if(nanoStatus!=null&&settings!=null&&settings.activeProvider()==Provider.GEMINI_NANO)nanoStatus.setText("Nano paused until this companion returns to the foreground");super.onPause();}
     @Override protected void onDestroy(){network.shutdownNow();super.onDestroy();}
 }

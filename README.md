@@ -69,13 +69,13 @@ The APK intentionally does not contain provider keys. Enter them on the phone af
 
 The **Speaker biography** field stores the user's self-description locally on the phone. Every provider prompt includes it as point-of-view context so branches sound like something that user might plausibly say. It is never treated as permission to invent additional biographical facts.
 
-### Pixel glasses simulator
+### G2 + phone companion
 
-Tap **Open glasses simulator** in the Android app to test without G2 hardware. Language and playful/strategic style are controlled exclusively on the phone and are never printed on the glasses. American English is the default and there is no Auto mode. R1 scroll moves through eight active responses; R1 press regenerates all eight using the complete current conversation context. Text-to-speech remains available from the phone through **Speak selected (legacy)**. The lens shows two queue entries at a time. During automatic contextual refreshes, the selected response and its immediate neighbors are locked while the five unprotected slots can be replaced. An explicit R1 refresh replaces all eight. English branches use at most two lines.
+The Android app is now only the phone companion/settings surface; the separate phone glasses simulator is no longer registered. Language and playful/strategic style are controlled exclusively on the phone and are never printed on the glasses. American English is the default and there is no Auto mode. R1 scroll moves through eight active responses; R1 press regenerates all eight using the complete current conversation context. The lens shows two queue entries at a time. During automatic contextual refreshes, the selected response and its immediate neighbors are locked while the five unprotected slots can be replaced. An explicit R1 refresh replaces all eight. English branches use at most two lines.
 
 Foreign branches always carry three separate values: English meaning, native-language writing, and an American-English-readable pronunciation of that native phrase. The phone toggle **Show native characters instead of phonetic English** defaults off. Thus French displays `bohn-ZHOOR` by default and `bonjour` when enabled. A phone-selected foreign language is authoritative even if a provider incorrectly reports English; incomplete foreign output is rejected rather than displayed as English phonetics.
 
-The simulator also keeps a persistent on-phone transcript and speaker list. The biography supplies the primary speaker name when it contains a phrase such as “My name is John.” After the primary speaker asks “What’s your name?”, the next short respondent answer is saved as that speaker’s name. **Conversation breakpoint** inserts a durable transcript marker and clears the transient lens/queue state. **Translate & pin** sends typed English to the selected foreign language and pins the bilingual result to queue position one. English committed with **I said it** in foreign mode follows the same immediate pinned path. Foreign sessions initially request six common greeting and inquisitive phrases.
+The biography supplies the primary speaker name when it contains a phrase such as “My name is John.” Provider prompts carry that saved point of view alongside the recent conversation.
 
 Provider prompts carry the speaker biography, compressed recent named turns, phone-selected `language`, and `persona=P|S`. They require exactly eight structured branches in this order: inquisitive risk 1, declarative risk 1, inquisitive risk 2, declarative risk 2, inquisitive risk 3, declarative risk 3, inquisitive risk 4, declarative risk 4. Risk 4 is the deliberately extreme option. These classifications are not shown on the glasses.
 
@@ -85,7 +85,13 @@ SPEAKER BIOGRAPHY: My name is John. I am a photographer from Chicago.
 Conversation transcript: Speakers: John · Katy. Recent turns: Katy: I love Warsaw...
 ```
 
-The backend can be switched from either the main settings screen or the selector inside the simulator. Selecting a backend makes it active immediately. The Gemini choices are deliberately separate: **Gemini Nano · on-device** is private, offline-capable, and keyless; **Google Gemini** is the cloud API and still requires a key.
+The backend can be switched from either the main phone settings screen or the EvenHub surface. Selecting a backend makes it active immediately. The Gemini choices are deliberately separate: **Gemini Nano · on-device** is private, offline-capable, and keyless; **Google Gemini** is the cloud API and still requires a key.
+
+Gemini Nano/AICore permits generation only while this companion app is the top foreground app. Select Nano or tap **Enable Nano foreground mode** on the phone; the app keeps the screen awake. If the glasses ask for a Nano branch while the companion is backgrounded, the bridge returns a foreground-required state and posts a tappable **Activate Gemini Nano** notification. Android does not allow an ordinary background app to force itself onscreen, so this tap is the supported handoff instead of an unreliable automatic launch.
+
+### Prototype hot reload without repeated QR scans
+
+Run `npm run dev:glasses`, scan the prototype URL once in EvenHub, and leave that development session open. Vite and EvenHub hot reload subsequent code edits automatically; a new QR scan is not required for each edit. The public/private `.ehpk` release flow remains the route for a version that starts without the Ubuntu development server.
 
 The default xAI model is `grok-4.20-0309-non-reasoning`, selected for conversation-copilot latency. Older saved defaults equal to `grok-4.6` are migrated automatically; that reasoning model can spend hundreds of hidden reasoning tokens before emitting any branch text. A manually configured alternate xAI model is preserved, and `grok-4.6` requests are forced to low reasoning effort.
 
@@ -95,7 +101,7 @@ The language menu offers only American English (`en-US`) for English, plus Spani
 
 The lens reserves three fixed-height regions: English context at the top, then branch one and branch two. Translation mode shows only the English translation in the top region—there is no “they said” label or placeholder. Each foreign-language branch always shows its English meaning on one line and stupidly simple phonetic pronunciation directly beneath it. Stressed syllables are ALL CAPS (`TEEN DOE Bray`, `BWAY-nohs DEE-ahs`, `bohn-ZHOOR`, `GOO-ten tahk`). The contract rejects missing fields and embedded newlines. The G2 SDK exposes one fixed firmware font and no font-size control, so prompts target 36 characters per field; complete over-target responses are retained and flagged rather than disappearing. Partial microphone results continue accumulating off-screen and trigger provider snapshots, but the lens commits only complete response objects, so suggestions change as stable chunks rather than token-by-token.
 
-A live provider log appears below the simulator. It shows outbound transcript snapshots and control settings, incoming xAI SSE chunks, completed parsed responses, and network or parsing errors. API keys and authorization headers are never written to the log.
+A live provider log appears on the companion surface. It shows outbound transcript snapshots and control settings, incoming xAI SSE chunks, completed parsed responses, and network or parsing errors. API keys and authorization headers are never written to the log.
 
 The provider-status row distinguishes connection setup, request upload, waiting for HTTP, active SSE streaming, completion, supersession, errors, and timeout. It also shows elapsed seconds while work is active. Every provider operation has a 30-second whole-request deadline, including xAI streams that might otherwise keep a socket alive indefinitely.
 
@@ -126,7 +132,7 @@ sudo apt install openjdk-21-jdk-headless google-android-platform-tools-installer
 ## What is real vs mocked
 
 - Real: conversation state, rendering policy, word-windowing, ring actions, provider-neutral request/response contract, privacy state.
-- Mocked in the browser: speech recognition, speaker identification, translation, phonetics, and LLM network calls. The Android simulator uses the Pixel's real speech-recognition service and the configured provider for translation, phonetics, and branches.
+- Browser-only demo code remains useful for deterministic tests; the shipped workflow is the EvenHub G2 surface plus the Android phone companion.
 - Hardware adapter: `src/even-adapter.ts` documents the narrow boundary to implement with `@evenrealities/even_hub_sdk` after testing on the shipped G2/R1.
 
 See [TECHNICAL_PLAN.md](./TECHNICAL_PLAN.md) for researched capabilities, architecture, rollout, and acceptance tests.
