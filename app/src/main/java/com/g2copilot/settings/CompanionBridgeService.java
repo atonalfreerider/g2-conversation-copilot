@@ -55,6 +55,10 @@ public final class CompanionBridgeService extends Service {
                 respond(socket, 200, new JSONObject().put("provider", p.name()).toString());
                 return;
             }
+            if (first.contains(" /realtime-token ")) {
+                respond(socket, 200, realtimeToken(req.optString("language", "en-US")).toString());
+                return;
+            }
             if (first.contains(" /transcribe ")) {
                 String transcript = transcribe(
                         Base64.decode(req.getString("audio"), Base64.DEFAULT),
@@ -131,6 +135,13 @@ public final class CompanionBridgeService extends Service {
         if ("RU".equals(code)) return "{english:'Hello',native:'Привет',phonetic:'pree-VYET'}";
         if ("ZH".equals(code)) return "{english:'Hello',native:'你好',phonetic:'nee HOW'}";
         return "{english:'Hello',native:'Hello',phonetic:'Hello'}";
+    }
+    private JSONObject realtimeToken(String tag)throws Exception{
+        String source=Locale.forLanguageTag(tag).getLanguage();
+        JSONObject turnDetection=new JSONObject().put("type","server_vad").put("threshold",0.45).put("prefix_padding_ms",300).put("silence_duration_ms",250);
+        JSONObject input=new JSONObject().put("format",new JSONObject().put("type","audio/pcm").put("rate",24000)).put("transcription",new JSONObject().put("model","gpt-4o-mini-transcribe").put("language",source)).put("noise_reduction",new JSONObject().put("type","far_field")).put("turn_detection",turnDetection);
+        JSONObject request=new JSONObject().put("expires_after",new JSONObject().put("anchor","created_at").put("seconds",600)).put("session",new JSONObject().put("type","transcription").put("audio",new JSONObject().put("input",input)));
+        HttpURLConnection c=(HttpURLConnection)new URL("https://api.openai.com/v1/realtime/client_secrets").openConnection();c.setRequestMethod("POST");c.setConnectTimeout(12_000);c.setReadTimeout(20_000);c.setDoOutput(true);c.setRequestProperty("Authorization","Bearer "+new SecureSettings(this).key(Provider.OPENAI));c.setRequestProperty("Content-Type","application/json");try(OutputStream out=c.getOutputStream()){out.write(request.toString().getBytes(StandardCharsets.UTF_8));}int code=c.getResponseCode();String raw=read(code<400?c.getInputStream():c.getErrorStream());if(code>=400)throw new IllegalStateException("Realtime token HTTP "+code+": "+new JSONObject(raw).optJSONObject("error").optString("message","unknown error"));JSONObject response=new JSONObject(raw);return new JSONObject().put("value",response.getString("value")).put("expires_at",response.optLong("expires_at"));
     }
     private String transcribe(byte[] wav,String tag)throws Exception{SecureSettings s=new SecureSettings(this);String sourceLanguage=Locale.forLanguageTag(tag).getLanguage();boolean translate=!"en".equals(sourceLanguage);String endpoint=translate?"translations":"transcriptions";String boundary="----g2"+System.currentTimeMillis();HttpURLConnection c=(HttpURLConnection)new URL("https://api.openai.com/v1/audio/"+endpoint).openConnection();c.setRequestMethod("POST");c.setConnectTimeout(12_000);c.setReadTimeout(30_000);c.setDoOutput(true);c.setRequestProperty("Authorization","Bearer "+s.key(Provider.OPENAI));c.setRequestProperty("Content-Type","multipart/form-data; boundary="+boundary);ByteArrayOutputStream body=new ByteArrayOutputStream();part(body,boundary,"model",null,(translate?"whisper-1":"gpt-4o-mini-transcribe").getBytes(StandardCharsets.UTF_8));if(!translate)part(body,boundary,"language",null,sourceLanguage.getBytes(StandardCharsets.UTF_8));part(body,boundary,"file","turn.wav",wav);body.write(("--"+boundary+"--\r\n").getBytes(StandardCharsets.UTF_8));try(OutputStream out=c.getOutputStream()){body.writeTo(out);}int code=c.getResponseCode();InputStream stream=code<400?c.getInputStream():c.getErrorStream();String raw=read(stream);if(code>=400)throw new IllegalStateException("Transcription HTTP "+code);String text=new JSONObject(raw).optString("text").trim();return text.equals("...")?"":text;}
     private void part(OutputStream out,String boundary,String name,String filename,byte[] value)throws Exception{out.write(("--"+boundary+"\r\nContent-Disposition: form-data; name=\""+name+"\""+(filename==null?"":"; filename=\""+filename+"\"")+"\r\n"+(filename==null?"":"Content-Type: audio/wav\r\n")+"\r\n").getBytes(StandardCharsets.UTF_8));out.write(value);out.write("\r\n".getBytes(StandardCharsets.UTF_8));}
