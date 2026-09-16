@@ -11,7 +11,6 @@ public final class CompanionBridgeService extends Service {
     private PendingIntent openCompanion(){Intent open=new Intent(this,MainActivity.class).setAction(ACTION_NANO_FOREGROUND).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_SINGLE_TOP|Intent.FLAG_ACTIVITY_CLEAR_TOP);return PendingIntent.getActivity(this,91,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);}
     private Notification bridgeNotification(){boolean nano=new SecureSettings(this).activeProvider()==Provider.GEMINI_NANO;return new Notification.Builder(this,"g2_bridge").setSmallIcon(android.R.drawable.ic_btn_speak_now).setContentTitle("G2 Conversation Copilot").setContentText(nano?(ForegroundState.mainActivityVisible?"Gemini Nano active in foreground":"Gemini Nano paused — tap to resume"):"EvenHub provider bridge active").setContentIntent(openCompanion()).setOngoing(true).build();}
     private void postNanoAttention(){Notification n=new Notification.Builder(this,"g2_nano").setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle("Tap to activate Gemini Nano").setContentText("Offline generation requires G2 Copilot in the foreground").setContentIntent(openCompanion()).setAutoCancel(true).setPriority(Notification.PRIORITY_HIGH).build();getSystemService(NotificationManager.class).notify(8788,n);}
-    private void postSpeechAttention(){Notification n=new Notification.Builder(this,"g2_nano").setSmallIcon(android.R.drawable.ic_btn_speak_now).setContentTitle("Tap to activate on-device speech").setContentText("Pixel transcription requires G2 Copilot in the foreground").setContentIntent(openCompanion()).setAutoCancel(true).setPriority(Notification.PRIORITY_HIGH).build();getSystemService(NotificationManager.class).notify(8789,n);}
     private void startServer(){running=true;pool.execute(()->{try{server=new ServerSocket(PORT,16,InetAddress.getByName("127.0.0.1"));while(running){Socket socket=server.accept();pool.execute(()->handle(socket));}}catch(Exception ignored){}});}
     private void handle(Socket socket) {
         if (socket == null) return;
@@ -68,7 +67,6 @@ public final class CompanionBridgeService extends Service {
                 return;
             }
             if (first.contains(" /speech/start ")) {
-                if(!ForegroundState.mainActivityVisible){postSpeechAttention();respond(socket,409,new JSONObject().put("error","On-device speech paused — tap the G2 Copilot notification and keep the companion foreground").put("requiresForeground",true).toString());return;}
                 respond(socket, 200, speech.start(req.optString("language", "en-US")).toString());
                 return;
             }
@@ -89,6 +87,10 @@ public final class CompanionBridgeService extends Service {
             if (first.contains(" /speech/stop ")) {
                 speech.stop();
                 respond(socket, 200, speech.snapshot().toString());
+                return;
+            }
+            if (first.contains(" /translate ")) {
+                respond(socket, 200, speech.translateText(req.optString("text", "")).toString());
                 return;
             }
             if (first.contains(" /transcribe ")) {
@@ -171,8 +173,7 @@ public final class CompanionBridgeService extends Service {
     }
     private JSONObject realtimeToken(String tag)throws Exception{
         String source=Locale.forLanguageTag(tag).getLanguage();
-        JSONObject turnDetection=new JSONObject().put("type","server_vad").put("threshold",0.45).put("prefix_padding_ms",300).put("silence_duration_ms",250);
-        JSONObject input=new JSONObject().put("format",new JSONObject().put("type","audio/pcm").put("rate",24000)).put("transcription",new JSONObject().put("model","gpt-4o-mini-transcribe").put("language",source)).put("noise_reduction",new JSONObject().put("type","far_field")).put("turn_detection",turnDetection);
+        JSONObject input=new JSONObject().put("format",new JSONObject().put("type","audio/pcm").put("rate",24000)).put("transcription",new JSONObject().put("model","gpt-live-transcribe").put("languages",new JSONArray().put(source)).put("delay","minimal")).put("noise_reduction",new JSONObject().put("type","far_field")).put("turn_detection",JSONObject.NULL);
         JSONObject request=new JSONObject().put("expires_after",new JSONObject().put("anchor","created_at").put("seconds",600)).put("session",new JSONObject().put("type","transcription").put("audio",new JSONObject().put("input",input)));
         HttpURLConnection c=(HttpURLConnection)new URL("https://api.openai.com/v1/realtime/client_secrets").openConnection();c.setRequestMethod("POST");c.setConnectTimeout(12_000);c.setReadTimeout(20_000);c.setDoOutput(true);c.setRequestProperty("Authorization","Bearer "+new SecureSettings(this).key(Provider.OPENAI));c.setRequestProperty("Content-Type","application/json");try(OutputStream out=c.getOutputStream()){out.write(request.toString().getBytes(StandardCharsets.UTF_8));}int code=c.getResponseCode();String raw=read(code<400?c.getInputStream():c.getErrorStream());if(code>=400)throw new IllegalStateException("Realtime token HTTP "+code+": "+new JSONObject(raw).optJSONObject("error").optString("message","unknown error"));JSONObject response=new JSONObject(raw);return new JSONObject().put("value",response.getString("value")).put("expires_at",response.optLong("expires_at"));
     }
