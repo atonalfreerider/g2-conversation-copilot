@@ -17,3 +17,7 @@ test("translation is clean and phonetics use English sound chunks",()=>{
 });
 
 test("foreign branches require two strict one-line fields",()=>{const value=prompt();assert.match(value,/BOTH english and phonetic are mandatory/);assert.match(value,/one complete line of at most 36 characters/);});
+
+test("contrarian mode challenges claims without becoming hostile",()=>{
+  const value=prompt({mode:"contrarian"});assert.match(value,/persona=C/);assert.match(value,/challenge assumptions/);assert.match(value,/evidence-seeking/);assert.match(value,/non-hostile/);
+});

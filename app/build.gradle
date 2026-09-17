@@ -7,8 +7,8 @@ android {
         applicationId 'com.g2copilot.settings'
         minSdk 28
         targetSdk 35
-        versionCode 6
-        versionName '0.3.2'
+        versionCode 8
+        versionName '0.3.4'
     }
     kotlinOptions { jvmTarget = '1.8' }
 }

@@ -18,15 +18,18 @@ export const suggestionSchema = {
 export function buildPrompt(req) {
   const style = req.mode === "playful"
     ? "warm, playful, lightly sarcastic when clearly welcome; never sexual or coercive"
+    : req.mode === "contrarian"
+    ? "argumentative and contrarian; challenge assumptions, expose contradictions, and offer sharp counterpoints while staying curious, evidence-seeking, and non-hostile"
     : "curious and trust-building; never manipulate, pressure, diagnose, or exploit vulnerability";
-  const variables = `CONTROL VARIABLES: language=AUTO; persona=${req.mode === "playful" ? "P" : "S"}; stance=${req.tone.stance === "inquisitive" ? "I" : "D"}; risk=${req.tone.risk}/7.`;
+  const persona = req.mode === "playful" ? "P" : req.mode === "contrarian" ? "C" : "S";
+  const variables = `CONTROL VARIABLES: language=AUTO; persona=${persona}; stance=${req.tone.stance === "inquisitive" ? "I" : "D"}; risk=${req.tone.risk}/7.`;
   const biography = (req.biography ?? "").trim() || "No biography provided.";
   const risk = req.tone.risk === 7
     ? "RISK 7 IS MAXIMUM SOCIAL BOLDNESS. Prefer daring, provocative, confidently flirtatious, vulnerable, surprising, or playfully challenging branches. Take a real social chance. Do not retreat to generic empathy, bland agreement, safe small talk, or merely ask what happened next. Still never use deception, coercion, illegality, harassment, or ignore boundaries."
     : `Risk ${req.tone.risk}/7 controls social boldness; calibrate it materially rather than defaulting to generic safe phrasing.`;
   return `${variables}
 Act as an unobtrusive conversation coach. Style: ${style}.
-Interpret P as playful, S as strategic, I as inquisitive, and D as declarative. ${risk}
+Interpret P as playful, S as strategic, C as argumentative/contrarian, I as inquisitive, and D as declarative. ${risk}
 Speaker biography (the user's identity and point of view; use it to shape suggestions naturally, but never invent facts beyond it): ${biography}
 Return only the supplied schema. Detect the spoken language and return its ISO 639-1 two-letter code. englishContext must be ONLY a clean English translation of the latest ${req.contextWordCount} microphone words: no labels, speaker attribution, explanation, language name, or commentary.
 STRICT G2 LINE POLICY: every branch field is one complete line of at most 36 characters, with no newline; never cut a word. For English speech, set native and phonetic to empty strings. For foreign speech, BOTH english and phonetic are mandatory: english is the clean meaning, and phonetic is the exact same reply in stupidly easy English sound chunks. CAPITALIZE every stressed/emphasized syllable and keep unstressed syllables lowercase. Examples: Polish “Dzień dobry” → “TEEN DOE Bray”; Spanish “buenos días” → “BWAY-nohs DEE-ahs”; French “bonjour” → “bohn-ZHOOR”; German “guten Tag” → “GOO-ten tahk”. Use spaces and simple hyphens; never native spelling, diacritics, or linguistic notation.

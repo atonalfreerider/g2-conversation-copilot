@@ -5,7 +5,7 @@ This is a dependency-free interaction prototype for an Even G2 conversation copi
 The ring changes future suggestions rather than selecting a scripted response:
 
 - Press cycles the active axis: persona → stance → risk.
-- On persona, either scroll direction toggles `P` playful / `S` strategic.
+- Conversation style supports `P` playful, `S` strategic/trust-building, and `C` argumentative/contrarian. Contrarian branches challenge assumptions and surface contradictions while remaining evidence-seeking and non-hostile.
 - On stance, either scroll direction toggles `I` inquisitive / `D` declarative.
 - On risk, scroll adjusts `1` safest through `7` riskiest.
 - Double press stops the session.
@@ -79,7 +79,9 @@ Foreign branches always carry three separate values: English meaning, native-lan
 
 The biography supplies the primary speaker name when it contains a phrase such as “My name is John.” Provider prompts carry that saved point of view alongside the recent conversation.
 
-Provider prompts carry the speaker biography, compressed recent named turns, phone-selected `language`, and `persona=P|S`. They require exactly eight structured branches in this order: inquisitive risk 1, declarative risk 1, inquisitive risk 2, declarative risk 2, inquisitive risk 3, declarative risk 3, inquisitive risk 4, declarative risk 4. Risk 4 is the deliberately extreme option. These classifications are not shown on the glasses.
+Provider prompts carry the speaker biography, compressed recent named turns, phone-selected `language`, and `persona=P|S|C`. They require exactly eight structured branches in this order: inquisitive risk 1, declarative risk 1, inquisitive risk 2, declarative risk 2, inquisitive risk 3, declarative risk 3, inquisitive risk 4, declarative risk 4. Risk 4 is the deliberately extreme option. These classifications are not shown on the glasses.
+
+The G2 branch region is packed dynamically. Two short branches share a row in independent left and right text containers; a longer branch receives a full-width row. This uses the full 576×288 display while keeping each response independently selectable. Because the G2 font is proportional and has no right-alignment control, the right-hand response is positioned in a separate half-width container instead of being aligned with fragile space padding. The SDK permits eight text containers, so one transcript container plus up to seven visible branch containers are used; scrolling brings the eighth queued branch into view.
 
 ```text
 CONTROL VARIABLES: language=PL; persona=P.
@@ -99,7 +101,9 @@ The default xAI model is `grok-4.20-0309-non-reasoning`, selected for conversati
 
 Choose the language on the phone before speaking. This passes its locale to Android speech recognition and prevents Google Speech from forcing foreign speech into English homonyms. There is deliberately no automatic language mode.
 
-The language menu offers only American English (`en-US`) for English, plus Spanish, French, German, Polish, Russian, Chinese, and the complete published Pixel transcription fallback set. Other English regional variants reported by the recognizer are filtered out. At runtime the app asks the phone's installed recognition service for `EXTRA_SUPPORTED_LANGUAGES`, so non-English choices follow Pixel/Google updates without an app release.
+The language menu offers only American English (`en-US`) for English, plus Spanish, French, German, Greek, Polish, Russian, Ukrainian, and Chinese. Greek (`el-GR`) and Ukrainian (`uk-UA`) use the same live English-translation pipeline and are also supported by the Pixel's ML Kit offline translation fallback. Other English regional variants are deliberately not offered.
+
+After every completed utterance—and earlier when a stable partial reaches sentence punctuation—the app requests four anticipatory candidates. Each candidate carries a 0–100 provider relevance vote based on immediate fit and usefulness across the next one or two predictable turns. Existing scores decay as context advances; duplicates are merged; the lowest-scoring unpinned entries are replaced in place. R1 focus adds a small user-interest vote. If speech approximately matches any branch's English, native, or phonetic line, that exact branch is pinned through the current and next ranking cycle so it cannot disappear while being spoken. R1 press remains the explicit full eight-branch regeneration.
 
 The lens reserves three fixed-height regions: English context at the top, then branch one and branch two. Translation mode shows only the English translation in the top region—there is no “they said” label or placeholder. Each foreign-language branch always shows its English meaning on one line and stupidly simple phonetic pronunciation directly beneath it. Stressed syllables are ALL CAPS (`TEEN DOE Bray`, `BWAY-nohs DEE-ahs`, `bohn-ZHOOR`, `GOO-ten tahk`). The contract rejects missing fields and embedded newlines. The G2 SDK exposes one fixed firmware font and no font-size control, so prompts target 36 characters per field; complete over-target responses are retained and flagged rather than disappearing. Partial microphone results continue accumulating off-screen and trigger provider snapshots, but the lens commits only complete response objects, so suggestions change as stable chunks rather than token-by-token.
 

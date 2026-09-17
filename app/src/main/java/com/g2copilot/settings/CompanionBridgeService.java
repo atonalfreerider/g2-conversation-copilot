@@ -134,32 +134,40 @@ public final class CompanionBridgeService extends Service {
         }
     }
     private void appendTurn(JSONObject req,String speaker,String text)throws Exception{JSONArray turns=req.optJSONArray("turns");if(turns==null){turns=new JSONArray();req.put("turns",turns);}turns.put(new JSONObject().put("speaker",speaker).put("text",text));}
-    private JSONObject suggest(JSONObject req)throws Exception{SecureSettings settings=new SecureSettings(this);Provider p=settings.activeProvider();String prompt=prompt(req);ProviderClient.Suggestions s;if(p==Provider.GEMINI_NANO){if(!ForegroundState.mainActivityVisible){postNanoAttention();throw new NanoForegroundRequiredException();}s=OnDeviceGeminiClient.suggest(prompt,null);}else s=ProviderClient.suggest(p,settings.url(p),settings.model(p),settings.key(p),prompt,null,new ProviderClient.Cancellation(){public boolean cancelled(){return false;}public void connected(HttpURLConnection c){}});JSONObject out=new JSONObject().put("context",s.context).put("provider",p.name());JSONArray branches=new JSONArray();for(Branch b:s.branches)branches.put(new JSONObject().put("english",b.english).put("native",b.nativeText).put("phonetic",b.phonetic));return out.put("branches",branches);}
+    private JSONObject suggest(JSONObject req)throws Exception{SecureSettings settings=new SecureSettings(this);Provider p=settings.activeProvider();String prompt=prompt(req);ProviderClient.Suggestions s;if(p==Provider.GEMINI_NANO){if(!ForegroundState.mainActivityVisible){postNanoAttention();throw new NanoForegroundRequiredException();}s=OnDeviceGeminiClient.suggest(prompt,null);}else s=ProviderClient.suggest(p,settings.url(p),settings.model(p),settings.key(p),prompt,null,new ProviderClient.Cancellation(){public boolean cancelled(){return false;}public void connected(HttpURLConnection c){}});JSONObject out=new JSONObject().put("context",s.context).put("provider",p.name());JSONArray branches=new JSONArray();for(Branch b:s.branches)branches.put(new JSONObject().put("english",b.english).put("native",b.nativeText).put("phonetic",b.phonetic).put("relevance",b.relevance));return out.put("branches",branches);}
     private static final class NanoForegroundRequiredException extends Exception{NanoForegroundRequiredException(){super("Gemini Nano is paused — tap the G2 Copilot notification and keep the companion foreground");}}
     private String prompt(JSONObject req) {
         String tag = req.optString("language", "en-US");
         String code = Locale.forLanguageTag(tag).getLanguage().toUpperCase(Locale.ROOT);
         String lang = Locale.forLanguageTag(tag).getDisplayLanguage(Locale.US);
-        String style = "S".equals(req.optString("style"))
+        String persona=req.optString("style","P");
+        String style = "S".equals(persona)
                 ? "strategic and trust-building"
+                : "C".equals(persona)
+                ? "argumentative and contrarian: challenge assumptions, expose contradictions, and offer sharp counterpoints while staying curious, evidence-seeking, and non-hostile"
                 : "playful, warm, lightly flirty when welcome";
+        int count=Math.max(1,Math.min(8,req.optInt("count",8)));
         StringBuilder turns = new StringBuilder();
         JSONArray a = req.optJSONArray("turns");
         if (a != null) for (int i = Math.max(0, a.length() - 16); i < a.length(); i++) {
             JSONObject t = a.optJSONObject(i);
             if (t != null) turns.append(t.optString("speaker")).append(": ").append(t.optString("text")).append('\n');
         }
+        String preview=req.optString("preview","").trim();if(!preview.isEmpty())turns.append("other (live partial): ").append(preview).append('\n');
+        StringBuilder active=new StringBuilder();JSONArray current=req.optJSONArray("activeBranches");if(current!=null)for(int i=0;i<current.length();i++){JSONObject b=current.optJSONObject(i);if(b!=null)active.append(i+1).append(". ").append(b.optString("english")).append('\n');}
         return "CONTROL VARIABLES: language=" + code + "; persona="
-                + ("S".equals(req.optString("style")) ? "S" : "P") + ".\n"
+                + (("S".equals(persona)||"C".equals(persona))?persona:"P") + ".\n"
+                + "BRANCH COUNT: "+count+".\n"
                 + "LANGUAGE LOCK: all suggested replies must be spoken in " + lang + ".\n"
                 + "Field contract example: " + languageExample(code) + ".\n"
                 + "The english field is the English meaning. The native field is its " + lang
                 + " translation and MUST NOT contain the English wording. The phonetic field pronounces native using simple American-English sound chunks.\n"
-                + "Style: " + style + ".\nConversation:\n" + turns
-                + "Return only JSON with language, context, and exactly EIGHT branch objects shaped {english,native,phonetic}, "
-                + "ordered inquisitive risk 1, declarative risk 1, inquisitive risk 2, declarative risk 2, inquisitive risk 3, "
-                + "declarative risk 3, inquisitive risk 4, declarative risk 4. Context is only a clean English translation of the latest turn. "
-                + "Risk 4 is maximum socially bold but never coercive or unsafe. Every field is one complete line of at most 36 characters and MUST be non-empty. "
+                + "Style: " + style + ". Predict the next one or two likely conversational turns and propose replies that are useful now and remain useful on those likely paths. Be specific and organic, never formulaic.\nConversation:\n" + turns
+                + "Current queue to compete against (do not paraphrase it):\n"+active
+                + "Return only JSON with language, context, and exactly "+count+" branch objects shaped {english,native,phonetic,relevance}. "
+                + (count==8?"Order them inquisitive risk 1, declarative risk 1, inquisitive risk 2, declarative risk 2, inquisitive risk 3, declarative risk 3, inquisitive risk 4, declarative risk 4. ":"Return the strongest varied alternatives across inquisitive/declarative and risk levels. ")
+                + "Relevance is an integer 0-100 voting score for immediate contextual fit plus usefulness on the most predictable next turn. Context is only a clean English translation of the latest turn. "
+                + "Risk 4 is maximum socially bold but never coercive or unsafe. Every text field is one complete line of at most 36 characters and MUST be non-empty. "
                 + "For English only, copy english into native and phonetic; the display ignores those two fields.";
     }
     private String languageExample(String code) {
@@ -168,6 +176,8 @@ public final class CompanionBridgeService extends Service {
         if ("DE".equals(code)) return "{english:'Hello',native:'Guten Tag',phonetic:'GOO-ten tahk'}";
         if ("PL".equals(code)) return "{english:'Good day',native:'Dzień dobry',phonetic:'TEEN DOE-bray'}";
         if ("RU".equals(code)) return "{english:'Hello',native:'Привет',phonetic:'pree-VYET'}";
+        if ("EL".equals(code)) return "{english:'Hello',native:'Γεια σου',phonetic:'YAH soo'}";
+        if ("UK".equals(code)) return "{english:'Hello',native:'Привіт',phonetic:'pree-VEET'}";
         if ("ZH".equals(code)) return "{english:'Hello',native:'你好',phonetic:'nee HOW'}";
         return "{english:'Hello',native:'Hello',phonetic:'Hello'}";
     }

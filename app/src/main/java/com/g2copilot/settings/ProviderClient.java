@@ -40,6 +40,7 @@ final class ProviderClient {
     }
     static Suggestions suggest(Provider provider,String baseUrl,String model,String apiKey,String prompt,LogSink log,Cancellation cancellation) throws Exception {
         if(apiKey.trim().isEmpty())throw new IllegalArgumentException("Configure the selected provider API key first.");
+        int branchCount=selectedBranchCount(prompt);
         URL url;JSONObject body=new JSONObject();
         if(provider==Provider.GEMINI){
             url=new URL(trimSlash(baseUrl)+"/models/"+encodePath(model)+":generateContent");
@@ -50,10 +51,10 @@ final class ProviderClient {
             // Eight complete branch objects need substantially more than 300 tokens.
             // A low xAI cap silently ended the SSE stream halfway through branch eight,
             // leaving otherwise valid JSON impossible to parse.
-            body.put(provider==Provider.OPENAI?"max_completion_tokens":"max_tokens",1200);
+            body.put(provider==Provider.OPENAI?"max_completion_tokens":"max_tokens",branchCount<=4?700:1200);
             if(provider==Provider.XAI&&model.startsWith("grok-4.6"))body.put("reasoning_effort","low");
             body.put("messages",new JSONArray().put(new JSONObject().put("role","system").put("content","Return only valid JSON. You are a discreet real-time conversation copilot. The selected output language is absolute: every native field must be written in that language, never English, and every phonetic field must pronounce that native phrase for an American reader.")).put(new JSONObject().put("role","user").put("content",prompt)));
-            body.put("response_format",branchResponseFormat(selectedLanguage(prompt)));
+            body.put("response_format",branchResponseFormat(selectedLanguage(prompt),branchCount));
             if(provider==Provider.XAI)body.put("stream",true);
         }
         String raw=provider==Provider.XAI?postStreamingXai(url,apiKey,body,log,cancellation):post(provider,url,apiKey,body);if(cancellation.cancelled())throw new java.io.IOException("SUPERSEDED");String content;
@@ -61,7 +62,7 @@ final class ProviderClient {
         if(provider==Provider.GEMINI)content=envelope.getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text");
         else content=envelope.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
         content=content.trim().replaceFirst("^```(?:json)?\\s*","").replaceFirst("\\s*```$","");JSONObject result=new JSONObject(content);
-        String selected=selectedLanguage(prompt),reported=result.optString("language","EN").toUpperCase(),detected="AUTO".equals(selected)?reported:selected;if(!"AUTO".equals(selected)&&!reported.equals(selected))throw new IllegalStateException("Provider returned "+reported+" while "+selected+" is selected");JSONArray values=result.getJSONArray("branches");if(values.length()<1)throw new IllegalStateException("Provider returned no branches");java.util.List<Branch> branches=new java.util.ArrayList<>();for(int i=0;i<Math.min(8,values.length());i++){JSONObject branch=values.optJSONObject(i);if(branch==null)throw new IllegalStateException("Provider returned an invalid branch");String english=oneLine(branch.optString("english",""));String nativeText=oneLine(branch.optString("native",""));String phonetic=oneLine(OutputSanitizer.cleanPhonetic(branch.optString("phonetic","")));if(english.isEmpty())throw new IllegalStateException("English meaning is required");if(!"EN".equals(detected)&&(phonetic.isEmpty()||nativeText.isEmpty()))throw new IllegalStateException("Foreign branch "+(i+1)+" is missing native or phonetic text");if(!"EN".equals(detected)&&nativeText.equalsIgnoreCase(english))throw new IllegalStateException("Foreign branch "+(i+1)+" duplicated: "+english);if(log!=null&&(english.length()>72||phonetic.length()>72||nativeText.length()>72))log.log("WARN branch exceeded two-line G2 target");branches.add(new Branch(english,phonetic,nativeText));}int seed=branches.size();for(int i=0;branches.size()<8;i++)branches.add(branches.get(i%seed));return new Suggestions(detected,OutputSanitizer.cleanTranslation(result.optString("context","")),branches);
+        String selected=selectedLanguage(prompt),reported=result.optString("language","EN").toUpperCase(),detected="AUTO".equals(selected)?reported:selected;if(!"AUTO".equals(selected)&&!reported.equals(selected))throw new IllegalStateException("Provider returned "+reported+" while "+selected+" is selected");JSONArray values=result.getJSONArray("branches");if(values.length()<1)throw new IllegalStateException("Provider returned no branches");java.util.List<Branch> branches=new java.util.ArrayList<>();for(int i=0;i<Math.min(branchCount,values.length());i++){JSONObject branch=values.optJSONObject(i);if(branch==null)throw new IllegalStateException("Provider returned an invalid branch");String english=oneLine(branch.optString("english",""));String nativeText=oneLine(branch.optString("native",""));String phonetic=oneLine(OutputSanitizer.cleanPhonetic(branch.optString("phonetic","")));if(english.isEmpty())throw new IllegalStateException("English meaning is required");if(!"EN".equals(detected)&&(phonetic.isEmpty()||nativeText.isEmpty()))throw new IllegalStateException("Foreign branch "+(i+1)+" is missing native or phonetic text");if(!"EN".equals(detected)&&nativeText.equalsIgnoreCase(english))throw new IllegalStateException("Foreign branch "+(i+1)+" duplicated: "+english);if(log!=null&&(english.length()>72||phonetic.length()>72||nativeText.length()>72))log.log("WARN branch exceeded two-line G2 target");branches.add(new Branch(english,phonetic,nativeText,branch.optInt("relevance",60-i)));}return new Suggestions(detected,OutputSanitizer.cleanTranslation(result.optString("context","")),branches);
     }
     private static String post(Provider provider,URL url,String apiKey,JSONObject body)throws Exception{
         HttpURLConnection connection=(HttpURLConnection)url.openConnection();connection.setRequestMethod("POST");connection.setConnectTimeout(12_000);connection.setReadTimeout(30_000);connection.setRequestProperty("Content-Type","application/json");
@@ -74,7 +75,7 @@ final class ProviderClient {
         StringBuilder content=new StringBuilder();try(BufferedReader reader=new BufferedReader(new InputStreamReader(connection.getInputStream(),StandardCharsets.UTF_8))){for(String line;(line=reader.readLine())!=null;){if(cancellation.cancelled())throw new java.io.IOException("SUPERSEDED");if(!line.startsWith("data:"))continue;String data=line.substring(5).trim();if("[DONE]".equals(data)){if(log!=null)log.log("SSE ← [DONE]");break;}JSONObject event=new JSONObject(data);JSONArray choices=event.optJSONArray("choices");if(choices==null||choices.length()==0)continue;JSONObject deltaObject=choices.getJSONObject(0).optJSONObject("delta");if(deltaObject!=null){String delta=deltaObject.optString("content","");content.append(delta);if(log!=null&&!delta.isEmpty())log.log("SSE ← "+delta);}}}
         return new JSONObject().put("choices",new JSONArray().put(new JSONObject().put("message",new JSONObject().put("content",content.toString())))).toString();
     }
-    private static JSONObject branchResponseFormat(String language) throws Exception {
+    private static JSONObject branchResponseFormat(String language,int count) throws Exception {
         JSONObject textField = new JSONObject().put("type", "string").put("minLength", 1);
         JSONObject branch = new JSONObject()
                 .put("type", "object")
@@ -82,8 +83,9 @@ final class ProviderClient {
                 .put("properties", new JSONObject()
                         .put("english", textField)
                         .put("native", new JSONObject().put("type", "string").put("minLength", 1))
-                        .put("phonetic", new JSONObject().put("type", "string").put("minLength", 1)))
-                .put("required", new JSONArray().put("english").put("native").put("phonetic"));
+                        .put("phonetic", new JSONObject().put("type", "string").put("minLength", 1))
+                        .put("relevance", new JSONObject().put("type","integer").put("minimum",0).put("maximum",100)))
+                .put("required", new JSONArray().put("english").put("native").put("phonetic").put("relevance"));
         JSONObject schema = new JSONObject()
                 .put("type", "object")
                 .put("additionalProperties", false)
@@ -92,8 +94,8 @@ final class ProviderClient {
                         .put("context", new JSONObject().put("type", "string"))
                         .put("branches", new JSONObject()
                                 .put("type", "array")
-                                .put("minItems", 8)
-                                .put("maxItems", 8)
+                                .put("minItems", count)
+                                .put("maxItems", count)
                                 .put("items", branch)))
                 .put("required", new JSONArray().put("language").put("context").put("branches"));
         return new JSONObject()
@@ -106,6 +108,7 @@ final class ProviderClient {
     private static String trimSlash(String value) { return value.endsWith("/") ? value.substring(0,value.length()-1) : value; }
     private static String oneLine(String value){return value.replace('\n',' ').replace('\r',' ').replaceAll("\\s+"," ").trim();}
     private static String selectedLanguage(String prompt){java.util.regex.Matcher m=java.util.regex.Pattern.compile("CONTROL VARIABLES: language=([A-Z]{2,8})").matcher(prompt);return m.find()?m.group(1):"EN";}
+    private static int selectedBranchCount(String prompt){java.util.regex.Matcher m=java.util.regex.Pattern.compile("BRANCH COUNT: (\\d+)").matcher(prompt);return m.find()?Math.max(1,Math.min(8,Integer.parseInt(m.group(1)))):8;}
     private static String encodePath(String value) { return value.replace("/", "%2F").replace(" ", "%20"); }
     private static String read(InputStream stream) throws Exception { if (stream == null) return ""; BufferedReader r=new BufferedReader(new InputStreamReader(stream,StandardCharsets.UTF_8)); StringBuilder b=new StringBuilder(); for(String line;(line=r.readLine())!=null;) b.append(line); return b.toString(); }
     private static String safeMessage(String raw) { try { JSONObject j=new JSONObject(raw); JSONObject e=j.optJSONObject("error"); return e == null ? "Provider rejected the request" : e.optString("message","Provider rejected the request"); } catch(Exception ignored) { return "Provider rejected the request"; } }
